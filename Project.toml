@@ -1,3 +1,9 @@
 name = "ComplementOpt"
 uuid = "3144fb79-1414-4d28-b1d1-63dadd798e24"
 version = "0.1.0"
+
+[deps]
+JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
+
+[compat]
+JuMP = "1.29.1"
