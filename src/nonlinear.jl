@@ -1,3 +1,4 @@
+struct NonlinearReformulation end
 
 """
     reformulate_as_nonlinear_program!(model::MOI.ModelLike; relaxation=0.0)
@@ -94,4 +95,3 @@ function reformulate_as_nonlinear_program!(model::MOI.ModelLike; relaxation=0.0)
     MOI.delete(model, cc_cons)
     return ind_cc
 end
-
