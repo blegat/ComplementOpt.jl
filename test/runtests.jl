@@ -33,7 +33,7 @@ function test_model(model_func)
     MOI.Utilities.attach_optimizer(model)
     MOI.Utilities.attach_optimizer(backend(model).optimizer.model)
     if haskey(expected_models, model_func)
-        expected_func = expected[model_func]
+        expected_func = expected_models[model_func]
         expected = expected_func()
         MOI.Bridges._test_structural_identical(
             unsafe_backend(model).optimizer,
