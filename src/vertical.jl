@@ -5,10 +5,9 @@ const VF = Union{
 }
 
 function has_complementarity(model::MOI.ModelLike)
-    CC = MOI.Complements
-    cc_vov = MOI.get(model, MOI.ListOfConstraintIndices{MOI.VectorOfVariables, CC}())
-    cc_vf = MOI.get(model, MOI.ListOfConstraintIndices{VF, CC}())
-    return length(cc_vov) >= 1 || length(cc_vf) >= 1
+    return any(MOI.get(model, MOI.ListOfConstraintTypesPresent())) do (F, S)
+        S == MOI.Complements
+    end
 end
 
 #=
@@ -151,8 +150,19 @@ function reformulate_to_vertical!(model::MOI.ModelLike)
 end
 
 function is_vertical(model::MOI.ModelLike)
-    CC = MOI.Complements
-    cc_vov = MOI.get(model, MOI.ListOfConstraintIndices{MOI.VectorOfVariables, CC}())
-    cc_vf = MOI.get(model, MOI.ListOfConstraintIndices{VF, CC}())
-    return length(cc_vov) == 1 && length(cc_vf) == 0
+    one_vov = false
+    for (F, S) in MOI.get(model, MOI.ListOfConstraintTypesPresent())
+        if S == MOI.Complements
+            if F == MOI.VectorOfVariables
+                if MOI.get(model, MOI.NumberOfConstraints{F,S}()) == 1
+                    one_vov = true
+                else
+                    return false
+                end
+            else
+                return false
+            end
+        end
+    end
+    return one_vov
 end

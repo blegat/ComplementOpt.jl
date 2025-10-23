@@ -6,8 +6,8 @@ using JuMP
 function fletcher_leyffer_ex1_model()
     model = Model()
     @variable(model, z[1:2])
+    set_lower_bound(z[2], 0)
     @objective(model, Min, (z[1] - 1)^2 + z[2]^2)
-    @constraint(model, z[2] >= 0)
     @constraint(model, z[2] - z[1] >= 0)
     @constraint(model, [z[2] - z[1], z[2]] ∈ MOI.Complements(2))
     return model
@@ -374,4 +374,3 @@ function water_net_model()
 
     return model
 end
-
