@@ -28,7 +28,7 @@ function reformulate_as_nonlinear_program!(model::MOI.ModelLike; relaxation=0.0)
         # Get bounds on x2
         lb2, ub2 = MOIU.get_bounds(model, Float64, x2)
         # x2 should have at least one bound, otherwise x1 becomes a fixed variable
-        @assert isinf(lb2) || isinf(ub2)
+        @assert isfinite(lb2) || isfinite(ub2)
         quad_terms = [
             MOI.ScalarQuadraticTerm(1.0, x1, x2)
         ]
