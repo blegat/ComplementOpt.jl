@@ -152,7 +152,7 @@ function _min_eps(a, b, eps)
             1.0 * a + 1.0 * b ,
             MOI.ScalarNonlinearFunction(
                 :sqrt,
-                Any[(1.0 * a + 1.0 * b)^2 + eps],
+                Any[(1.0 * a)^2 + (1.0 * b)^2 + eps^2],
             )
         ]
     )
@@ -165,7 +165,7 @@ function _max_eps(a, b, eps)
             1.0 * a + 1.0 * b ,
             MOI.ScalarNonlinearFunction(
                 :sqrt,
-                Any[(1.0 * a + 1.0 * b)^2 + eps],
+                Any[(1.0 * a)^2 + (1.0 * b)^2 + eps^2],
             )
         ]
     )
