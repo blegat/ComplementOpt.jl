@@ -116,7 +116,7 @@ function reformulate_to_vertical!(model::MOI.ModelLike)
                         else
                             # Else, reformulate LHS using vertical form
                             x1 = MOI.add_variable(model)
-                            new_lhs = MOIU.operate(-, Float64, lhs, x1)
+                            new_lhs = MOIU.operate!(-, Float64, lhs, x1)
                             MOI.add_constraint(model, new_lhs, MOI.EqualTo{Float64}(0))
                             push!(ind_cc1, x1)
                             push!(ind_cc2, x2)
