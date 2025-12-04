@@ -35,7 +35,7 @@ function nonlinear_test_reformulated_model()
     model = Model()
     @variable(model, x >= 0.0)
     @variable(model, y >= 0.0)
-    @variable(model, slack)
+    @variable(model, slack >= 0)
     @objective(model, Min, x^2 + y^2 - 4*x*y)
     # Build complementarity constraints with nonlinear expression
     @constraint(model, sin(x) == slack)
