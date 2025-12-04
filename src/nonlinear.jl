@@ -17,20 +17,28 @@ the complementarity constraints.
 If the complementarity constraints are not in vertical form, an error is thrown.
 
 """
-function reformulate_as_nonlinear_program!(model::MOI.ModelLike, relaxation::AbstractComplementarityRelaxation)
+function reformulate_as_nonlinear_program!(
+    model::MOI.ModelLike,
+    relaxation::AbstractComplementarityRelaxation,
+)
     if !is_vertical(model)
-        error("Complementarity constraints should be reformulated in vertical form before applying nonlinear reformulation")
+        error(
+            "Complementarity constraints should be reformulated in vertical form before applying nonlinear reformulation",
+        )
     end
 
-    cc_cons = MOI.get(model, MOI.ListOfConstraintIndices{MOI.VectorOfVariables, MOI.Complements}())[1]
+    cc_cons = MOI.get(
+        model,
+        MOI.ListOfConstraintIndices{MOI.VectorOfVariables,MOI.Complements}(),
+    )[1]
     fun = MOI.get(model, MOI.ConstraintFunction(), cc_cons)
     set = MOI.get(model, MOI.ConstraintSet(), cc_cons)
     n_comp = div(set.dimension, 2)
 
     ind_cc = []
-    for cc in 1:n_comp
+    for cc = 1:n_comp
         x1 = fun.variables[cc]
-        x2 = fun.variables[cc + n_comp]
+        x2 = fun.variables[cc+n_comp]
         # Get bounds on x2
         lb2, ub2 = MOIU.get_bounds(model, Float64, x2)
         # x2 should have at least one bound, otherwise x1 becomes a fixed variable
@@ -71,7 +79,10 @@ end
 function _relax_complementarity_lower_bound!(
     model::MOI.ModelLike,
     relaxation::ScholtesRelaxation,
-    x1, x2, lb2, ub2,
+    x1,
+    x2,
+    lb2,
+    ub2,
 )
     lb1, ub1 = MOIU.get_bounds(model, Float64, x1)
     if isinf(lb1)
@@ -80,11 +91,7 @@ function _relax_complementarity_lower_bound!(
         @assert lb1 == 0.0 # ensure we follow MOI's convention
         # TODO: what should we do if ub1 is finite?
     end
-    idc = MOI.add_constraint(
-        model,
-        x1 * (x2 - lb2),
-        MOI.LessThan(relaxation.tau),
-    )
+    idc = MOI.add_constraint(model, x1 * (x2 - lb2), MOI.LessThan(relaxation.tau))
     return [idc]
 end
 
@@ -92,7 +99,10 @@ end
 function _relax_complementarity_upper_bound!(
     model::MOI.ModelLike,
     relaxation::ScholtesRelaxation,
-    x1, x2, lb2, ub2,
+    x1,
+    x2,
+    lb2,
+    ub2,
 )
     lb1, ub1 = MOIU.get_bounds(model, Float64, x1)
     if isinf(ub1)
@@ -101,11 +111,7 @@ function _relax_complementarity_upper_bound!(
         @assert ub1 == 0.0 # ensure we follow MOI's convention
         # TODO: what should we do if lb1 is finite?
     end
-    idc = MOI.add_constraint(
-        model,
-        x1 * (x2 - ub2),
-        MOI.LessThan(relaxation.tau),
-    )
+    idc = MOI.add_constraint(model, x1 * (x2 - ub2), MOI.LessThan(relaxation.tau))
     return [idc]
 end
 
@@ -113,19 +119,14 @@ end
 function _relax_complementarity_range!(
     model::MOI.ModelLike,
     relaxation::ScholtesRelaxation,
-    x1, x2, lb2, ub2,
+    x1,
+    x2,
+    lb2,
+    ub2,
 )
     lb1, ub1 = MOIU.get_bounds(model, Float64, x1)
-    idc1 = MOI.add_constraint(
-        model,
-        x1 * (x2 - lb2),
-        MOI.LessThan(relaxation.tau),
-    )
-    idc2 = MOI.add_constraint(
-        model,
-        x1 * (x2 - ub2),
-        MOI.LessThan(relaxation.tau),
-    )
+    idc1 = MOI.add_constraint(model, x1 * (x2 - lb2), MOI.LessThan(relaxation.tau))
+    idc2 = MOI.add_constraint(model, x1 * (x2 - ub2), MOI.LessThan(relaxation.tau))
     return [idc1, idc2]
 end
 
@@ -149,12 +150,9 @@ function _min_eps(a, b, eps)
     return MOI.ScalarNonlinearFunction(
         :-,
         Any[
-            1.0 * a + 1.0 * b ,
-            MOI.ScalarNonlinearFunction(
-                :sqrt,
-                Any[(1.0 * a)^2 + (1.0 * b)^2 + eps^2],
-            )
-        ]
+            1.0*a+1.0*b,
+            MOI.ScalarNonlinearFunction(:sqrt, Any[(1.0*a)^2+(1.0*b)^2+eps^2]),
+        ],
     )
 end
 
@@ -162,12 +160,9 @@ function _max_eps(a, b, eps)
     return MOI.ScalarNonlinearFunction(
         :+,
         Any[
-            1.0 * a + 1.0 * b ,
-            MOI.ScalarNonlinearFunction(
-                :sqrt,
-                Any[(1.0 * a)^2 + (1.0 * b)^2 + eps^2],
-            )
-        ]
+            1.0*a+1.0*b,
+            MOI.ScalarNonlinearFunction(:sqrt, Any[(1.0*a)^2+(1.0*b)^2+eps^2]),
+        ],
     )
 end
 
@@ -175,7 +170,10 @@ end
 function _relax_complementarity_lower_bound!(
     model::MOI.ModelLike,
     relaxation::FischerBurmeisterRelaxation,
-    x1, x2, lb2, ub2,
+    x1,
+    x2,
+    lb2,
+    ub2,
 )
     lb1, ub1 = MOIU.get_bounds(model, Float64, x1)
     if isinf(lb1)
@@ -196,7 +194,10 @@ end
 function _relax_complementarity_upper_bound!(
     model::MOI.ModelLike,
     relaxation::FischerBurmeisterRelaxation,
-    x1, x2, lb2, ub2,
+    x1,
+    x2,
+    lb2,
+    ub2,
 )
     lb1, ub1 = MOIU.get_bounds(model, Float64, x1)
     if isinf(ub1)
@@ -217,7 +218,10 @@ end
 function _relax_complementarity_range!(
     model::MOI.ModelLike,
     relaxation::FischerBurmeisterRelaxation,
-    x1, x2, lb2, ub2,
+    x1,
+    x2,
+    lb2,
+    ub2,
 )
     lb1, ub1 = MOIU.get_bounds(model, Float64, x1)
     idc1 = MOI.add_constraint(
@@ -252,13 +256,12 @@ end
 function _relax_complementarity_lower_bound!(
     model::MOI.ModelLike,
     relaxation::LiuFukushimaRelaxation,
-    x1, x2, lb2, ub2,
+    x1,
+    x2,
+    lb2,
+    ub2,
 )
-    idc1 = MOI.add_constraint(
-        model,
-        x1 * (x2 - lb2),
-        MOI.LessThan(relaxation.epsilon^2),
-    )
+    idc1 = MOI.add_constraint(model, x1 * (x2 - lb2), MOI.LessThan(relaxation.epsilon^2))
     idc2 = MOI.add_constraint(
         model,
         (x1 + relaxation.epsilon) * (x2 - lb2 + relaxation.epsilon),
@@ -276,13 +279,12 @@ end
 function _relax_complementarity_upper_bound!(
     model::MOI.ModelLike,
     relaxation::LiuFukushimaRelaxation,
-    x1, x2, lb2, ub2,
+    x1,
+    x2,
+    lb2,
+    ub2,
 )
-    idc1 = MOI.add_constraint(
-        model,
-        x1 * (x2 - ub2),
-        MOI.LessThan(relaxation.epsilon^2),
-    )
+    idc1 = MOI.add_constraint(model, x1 * (x2 - ub2), MOI.LessThan(relaxation.epsilon^2))
     idc2 = MOI.add_constraint(
         model,
         (x1 - relaxation.epsilon) * (x2 - ub2 - relaxation.epsilon),
@@ -325,20 +327,20 @@ function _kanzow_schwarz_relaxation(a, b, eps)
     return MOI.ScalarNonlinearFunction(
         :ifelse,
         Any[
-            MOI.ScalarNonlinearFunction(
-                :>,
-                Any[1.0 * a + 1.0 * b, 2*eps],
-            ),
-            (a - eps) * (b - eps),
-            - 0.5 * ((a - eps)^2 + (b - eps)^2),
-        ]
+            MOI.ScalarNonlinearFunction(:>, Any[1.0*a+1.0*b, 2*eps]),
+            (a-eps)*(b-eps),
+            - 0.5*((a-eps)^2+(b-eps)^2),
+        ],
     )
 end
 
 function _relax_complementarity_lower_bound!(
     model::MOI.ModelLike,
     relaxation::KanzowSchwarzRelaxation,
-    x1, x2, lb2, ub2,
+    x1,
+    x2,
+    lb2,
+    ub2,
 )
     lb1, ub1 = MOIU.get_bounds(model, Float64, x1)
     if isinf(lb1)
@@ -359,7 +361,10 @@ end
 function _relax_complementarity_upper_bound!(
     model::MOI.ModelLike,
     relaxation::KanzowSchwarzRelaxation,
-    x1, x2, lb2, ub2,
+    x1,
+    x2,
+    lb2,
+    ub2,
 )
     lb1, ub1 = MOIU.get_bounds(model, Float64, x1)
     if isinf(ub1)
@@ -375,4 +380,3 @@ function _relax_complementarity_upper_bound!(
     )
     return [idc]
 end
-

@@ -19,7 +19,7 @@ function fletcher_leyffer_ex2_model()
     @variable(model, z[1:2] >= 0)
     @objective(model, Min, z[1] + z[2])
     @constraint(model, z[2]^2 >= 1)
-    @constraint(model, [z[1], z[2]] ∈  MOI.Complements(2))
+    @constraint(model, [z[1], z[2]] ∈ MOI.Complements(2))
     return model
 end
 
@@ -61,8 +61,8 @@ end
 function design_centering_model()
     x0 = [0.0, 0.0, 1.0]
     y0 = [
-        -1.000000000000073   0.2425356250359245                    0;
-                         0   0.9701425001468117   -1.000000000026019
+        -1.000000000000073 0.2425356250359245 0;
+        0 0.9701425001468117 -1.000000000026019
     ]
     l0 = [0.5, 0.5153882031999911, 0.4999999999777709]
     model = Model()
@@ -73,18 +73,21 @@ function design_centering_model()
     @objective(model, Min, -pi*x[3]^2)
     # ... lower level solutions lie in body G
     @constraint(model, g1, -y[1, 1] - y[2, 1]^2 <= 0.0)
-    @constraint(model, g2,  y[1, 2] / 4.0 + y[2, 2] <= 0.75)
+    @constraint(model, g2, y[1, 2] / 4.0 + y[2, 2] <= 0.75)
     @constraint(model, g3, -y[2, 3] <= 1.0)
     # ... first order conditions for 3 lower level problem
     @constraint(model, 1.0 + 2.0 * (y[1, 1] - x[1]) * l[1] == 0.0)
     @constraint(model, 2*y[2, 1] + 2.0 * (y[2, 1] - x[2]) * l[1] == 0.0)
     @constraint(model, -0.25 + 2.0 * (y[1, 2] - x[1]) * l[2] == 0.0)
     @constraint(model, -1.00 + 2.0 * (y[2, 2] - x[2]) * l[2] == 0.0)
-    @constraint(model,  0.00 + 2.0 * (y[1, 3] - x[1]) * l[3] == 0.0)
-    @constraint(model,  1.00 + 2.0 * (y[2, 3] - x[2]) * l[3] == 0.0)
+    @constraint(model, 0.00 + 2.0 * (y[1, 3] - x[1]) * l[3] == 0.0)
+    @constraint(model, 1.00 + 2.0 * (y[2, 3] - x[2]) * l[3] == 0.0)
     # complementarity
-    for k in 1:3
-        @constraint(model, [-(y[1,k] - x[1])^2 - (y[2,k] - x[2])^2 + x[3]^2, l[k]] ∈ MOI.Complements(2))
+    for k = 1:3
+        @constraint(
+            model,
+            [-(y[1, k] - x[1])^2 - (y[2, k] - x[2])^2 + x[3]^2, l[k]] ∈ MOI.Complements(2)
+        )
     end
     return model
 end
@@ -123,8 +126,8 @@ function desilva_model()
     @variable(model, y[1:2])
     @variable(model, 0.0 <= l[1:2])
     @objective(model, Min, x[1]^2 - 2*x[1] + x[2]^2 - 2*x[2] + y[1]^2 + y[2]^2)
-    for i in 1:2
-        @constraint(model, 2.0*y[i] - 2.0*x[i] + 2.0*(y[i] - 1.0) * l[i] == 0.0)
+    for i = 1:2
+        @constraint(model, 2.0*y[i] - 2.0*x[i] + 2.0 * (y[i] - 1.0) * l[i] == 0.0)
         @constraint(model, [0.25 - (y[i] - 1.0)^2, l[i]] ∈ MOI.Complements(2))
     end
     return model
@@ -192,9 +195,13 @@ function hakonsen_model_broken()
     @variable(model, t[1:2] >= 0.0)
     @objective(model, Min, (x[1] * x[2] * l)^(1/3))
     @constraint(model, prices[i=1:2], [(pL - p[i]), x[i]] ∈ MOI.Complements(2))
-    @constraint(model, consum2[i=1:2], [(x[i] * (3.0 * p[i] * (1+t[i])) - 100.0 * pL), p[i]] ∈  MOI.Complements(2))
-    @constraint(model, L*pL == sum(x[i] * p[i] for i in 1:2) + l*pL + G)
-    @constraint(model, revenue, sum(p[i] * t[i] * x[i] for i in 1:2) >= G)
+    @constraint(
+        model,
+        consum2[i=1:2],
+        [(x[i] * (3.0 * p[i] * (1+t[i])) - 100.0 * pL), p[i]] ∈ MOI.Complements(2)
+    )
+    @constraint(model, L*pL == sum(x[i] * p[i] for i = 1:2) + l*pL + G)
+    @constraint(model, revenue, sum(p[i] * t[i] * x[i] for i = 1:2) >= G)
     return model
 end
 
@@ -216,12 +223,16 @@ function qpec2_model()
     @variable(model, x[1:n], start=1.0)
     @variable(model, y[1:m] >= 0.0, start=1.0)
     @variable(model, s[1:n] >= 0.0)
-    @objective(model, Min, sum((x[i] + rr)^2 for i in 1:n) + sum((y[j] + ss)^2 for j in 1:m))
+    @objective(
+        model,
+        Min,
+        sum((x[i] + rr)^2 for i = 1:n) + sum((y[j] + ss)^2 for j = 1:m)
+    )
 
     @constraint(model, [i=1:n], y[i] - x[i] >= 0.0)
     @constraint(model, [i=1:n], [(y[i] - x[i]), y[i]] ∈ MOI.Complements(2))
     # This constraint is degenerate and should be replaced by y = 0
-    @constraint(model, [i=n+1:m], [y[i], y[i]] ∈ MOI.Complements(2))
+    @constraint(model, [i=(n+1):m], [y[i], y[i]] ∈ MOI.Complements(2))
     return model
 end
 
@@ -271,15 +282,25 @@ function water_net_model()
     reservoirs = [:NW, :E]
     consumers = [:CC, :W, :SW, :S, :SE, :N]
     arcs = [
-        (:NW ,  :W), (:NW , :CC), (:NW ,  :N),
-        (:E  ,  :N), (:E  , :CC), (:E  ,  :S), (:E  , :SE),
-        (:CC ,  :W), (:CC , :SW), (:CC ,  :S), (:CC ,  :N),
-        (:S  , :SE), (:S  , :SW), (:SW ,  :W),
+        (:NW, :W),
+        (:NW, :CC),
+        (:NW, :N),
+        (:E, :N),
+        (:E, :CC),
+        (:E, :S),
+        (:E, :SE),
+        (:CC, :W),
+        (:CC, :SW),
+        (:CC, :S),
+        (:CC, :N),
+        (:S, :SE),
+        (:S, :SW),
+        (:SW, :W),
     ]
-    supply = Dict{Symbol, Float64}(:NW => 2.5, :E => 6.0)
-    wcost = Dict{Symbol, Float64}(:NW => 0.2, :E => 0.17)
-    pcost = Dict{Symbol, Float64}(:NW => 1.02, :E => 1.02)
-    demand = Dict{Symbol, Float64}(
+    supply = Dict{Symbol,Float64}(:NW => 2.5, :E => 6.0)
+    wcost = Dict{Symbol,Float64}(:NW => 0.2, :E => 0.17)
+    pcost = Dict{Symbol,Float64}(:NW => 1.02, :E => 1.02)
+    demand = Dict{Symbol,Float64}(
         :NW => 0.0,
         :E => 0.0,
         :CC => 1.212,
@@ -289,35 +310,35 @@ function water_net_model()
         :SE => 0.252,
         :N => 0.456,
     )
-    height = Dict{Symbol, Float64}(
+    height = Dict{Symbol,Float64}(
         :NW => 6.50,
-        :E  => 3.25,
+        :E => 3.25,
         :CC => 3.02,
-        :W  => 5.16,
+        :W => 5.16,
         :SW => 4.20,
-        :S  => 1.50,
+        :S => 1.50,
         :SE => 0.00,
-        :N  => 6.30,
+        :N => 6.30,
     )
-    x = Dict{Symbol, Float64}(
-        :NW =>  1200,
-        :E  =>  4000,
-        :CC =>  2000,
-        :W  =>   750,
-        :SW =>   900,
-        :S  =>  2000,
-        :SE =>  4000,
-        :N  =>  3700,
+    x = Dict{Symbol,Float64}(
+        :NW => 1200,
+        :E => 4000,
+        :CC => 2000,
+        :W => 750,
+        :SW => 900,
+        :S => 2000,
+        :SE => 4000,
+        :N => 3700,
     )
-    y = Dict{Symbol, Float64}(
-        :NW =>  3600,
-        :E  =>  2200,
-        :CC =>  2300,
-        :W  =>  2400,
-        :SW =>  1200,
-        :S  =>  1000,
-        :SE =>   900,
-        :N  =>  3500,
+    y = Dict{Symbol,Float64}(
+        :NW => 3600,
+        :E => 2200,
+        :CC => 2300,
+        :W => 2400,
+        :SW => 1200,
+        :S => 1000,
+        :SE => 900,
+        :N => 3500,
     )
 
     dist = Dict((i, j) => sqrt((x[i] - x[j])^2 + (y[i] - y[j])^2) for (i, j) in arcs)
@@ -350,8 +371,10 @@ function water_net_model()
     @variable(model, 0 <= s[i in reservoirs] <= supply[i], start=rr*supply[i])
 
     @objective(
-        model, Min,
-        sum(s[i] * pcost[i] * (h[i] - height[i]) + s[i] * wcost[i] for i in reservoirs) / r +
+        model,
+        Min,
+        sum(s[i] * pcost[i] * (h[i] - height[i]) + s[i] * wcost[i] for i in reservoirs) /
+        r +
         dprc * sum(dist[(i, j)] * d[(i, j)]^cpow for (i, j) in arcs) +
         sum(qp[(i, j)] + qn[(i, j)] for (i, j) in arcs),
     )
@@ -367,7 +390,8 @@ function water_net_model()
     @constraint(
         model,
         loss[(i, j) in arcs],
-        h[i] - h[j] == hloss * dist[(i, j)] * (qp[(i, j)]^2 - qn[(i, j)]^2) / (d[(i, j)]^dpow),
+        h[i] - h[j] ==
+        hloss * dist[(i, j)] * (qp[(i, j)]^2 - qn[(i, j)]^2) / (d[(i, j)]^dpow),
     )
     # ... complementarity
     @constraint(model, [(i, j) in arcs], [qp[(i, j)], qn[(i, j)]] ∈ MOI.Complements(2))
