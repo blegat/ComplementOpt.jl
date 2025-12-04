@@ -2,6 +2,7 @@
 const VF = Union{
     MOI.VectorAffineFunction,
     MOI.VectorQuadraticFunction,
+    MOI.VectorNonlinearFunction,
 }
 
 function has_complementarity(model::MOI.ModelLike)
@@ -29,28 +30,13 @@ function _is_single_variable(func::MOI.ScalarQuadraticFunction)
         false
     end
 end
+function _is_single_variable(func::MOI.ScalarNonlinearFunction)
+    return func.head == :+ && length(func.args) == 1 && isa(func.args[1], MOI.VariableIndex)
+end
 _get_variable(func::MOI.ScalarAffineFunction) = func.terms[1].variable
 _get_variable(func::MOI.ScalarQuadraticFunction) = func.affine_terms[1].variable
+_get_variable(func::MOI.ScalarNonlinearFunction) = func.args[1]
 
-# Reformulate
-function _vertical_formulation!(model, terms::Vector{MOI.ScalarAffineTerm{T}}, c::T) where T
-    x = MOI.add_variable(model)
-    push!(terms, MOI.ScalarAffineTerm{T}(-one(T), x))
-    func = MOI.ScalarAffineFunction{T}(terms, zero(T))
-    MOI.add_constraint(model, func, MOI.EqualTo{T}(-c))
-    return x
-end
-
-function _add_slack!(model, func::MOI.ScalarAffineFunction{T}) where T
-    x = MOI.add_variable(model)
-    push!(func.terms, MOI.ScalarAffineTerm{T}(-one(T), x))
-    return x
-end
-function _add_slack!(model, func::MOI.ScalarQuadraticFunction{T}) where T
-    x = MOI.add_variable(model)
-    push!(func.affine_terms, MOI.ScalarAffineTerm{T}(-one(T), x))
-    return x
-end
 
 # TODO: add support for ScalarNonlinearTerm
 function _parse_complementarity_constraint(fun::MOI.AbstractVectorFunction, n_comp)
@@ -129,8 +115,9 @@ function reformulate_to_vertical!(model::MOI.ModelLike)
                             push!(ind_cc2, x2)
                         else
                             # Else, reformulate LHS using vertical form
-                            x1 = _add_slack!(model, lhs)
-                            MOI.add_constraint(model, lhs, MOI.EqualTo{Float64}(0))
+                            x1 = MOI.add_variable(model)
+                            new_lhs = MOIU.operate!(-, Float64, lhs, x1)
+                            MOI.add_constraint(model, new_lhs, MOI.EqualTo{Float64}(0))
                             push!(ind_cc1, x1)
                             push!(ind_cc2, x2)
                         end
