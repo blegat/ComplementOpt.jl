@@ -6,16 +6,16 @@ end
 
 using Test
 using JuMP
+using Ipopt
 
 using ComplementOpt
 
 function fletcher_leyffer_ex1_nonlinear_model()
     model = Model()
     @variable(model, z[1:2])
-    @variable(model, slack)
+    @variable(model, slack >= 0.0)
     set_lower_bound(z[2], 0)
     @objective(model, Min, (z[1] - 1)^2 + z[2]^2)
-    @constraint(model, z[2] - z[1] >= 0)
     @constraint(model, z[2] - z[1] == slack)
     @constraint(model, slack * z[2] <= 0)
     return model
@@ -35,7 +35,7 @@ function nonlinear_test_reformulated_model()
     model = Model()
     @variable(model, x >= 0.0)
     @variable(model, y >= 0.0)
-    @variable(model, slack)
+    @variable(model, slack >= 0)
     @objective(model, Min, x^2 + y^2 - 4*x*y)
     # Build complementarity constraints with nonlinear expression
     @constraint(model, sin(x) == slack)
@@ -91,4 +91,23 @@ end
     test_nonlinear_expr()
 end
 
+@testset "Relaxation method $(relax)" for relax in [
+    ComplementOpt.ScholtesRelaxation(0.0),
+    ComplementOpt.FischerBurmeisterRelaxation(1e-8),
+    ComplementOpt.LiuFukushimaRelaxation(1e-8),
+    ComplementOpt.KanzowSchwarzRelaxation(1e-8),
+]
+    model = Instances.fletcher_leyffer_ex1_model()
+    ind_cc1, ind_cc2 = ComplementOpt.reformulate_to_vertical!(JuMP.backend(model))
+    ComplementOpt.reformulate_as_nonlinear_program!(JuMP.backend(model), relax)
 
+    JuMP.set_optimizer(model, Ipopt.Optimizer)
+    # Need to set the bound relaxation explicitly to 0 for LiuFukushimaRelaxation
+    JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
+    JuMP.set_optimizer_attribute(model, "bound_push", 1e-1)
+    JuMP.set_silent(model)
+    JuMP.optimize!(model)
+
+    @test JuMP.objective_value(model) ≈ 0.5 atol=1e-7
+    @test JuMP.value.(model[:z]) ≈ [0.5, 0.5] atol=1e-7
+end
