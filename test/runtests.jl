@@ -27,7 +27,6 @@ expected_models = Dict(
 
 function test_model(model_func)
     model = model_func()
-    model = Instances.fletcher_leyffer_ex1_model()
     inner = MOI.Utilities.Model{Float64}()
     set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
     MOI.Utilities.attach_optimizer(model)
