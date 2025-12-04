@@ -180,7 +180,8 @@ end
 # attributed to Hakonsen, L. "Essays on Taxation, Efficiency and the
 # Environment", PhD thesis, Norwegian School of Economics & Business
 # Administration, April 1998.
-function hakonsen_model()
+# TODO: require to add support for MOI.VectorNonlinearFunction
+function hakonsen_model_broken()
     L = 100.0
     G = 25.0
     pL = 1.0
