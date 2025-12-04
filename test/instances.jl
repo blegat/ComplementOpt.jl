@@ -223,11 +223,7 @@ function qpec2_model()
     @variable(model, x[1:n], start=1.0)
     @variable(model, y[1:m] >= 0.0, start=1.0)
     @variable(model, s[1:n] >= 0.0)
-    @objective(
-        model,
-        Min,
-        sum((x[i] + rr)^2 for i = 1:n) + sum((y[j] + ss)^2 for j = 1:m)
-    )
+    @objective(model, Min, sum((x[i] + rr)^2 for i = 1:n) + sum((y[j] + ss)^2 for j = 1:m))
 
     @constraint(model, [i=1:n], y[i] - x[i] >= 0.0)
     @constraint(model, [i=1:n], [(y[i] - x[i]), y[i]] ∈ MOI.Complements(2))
