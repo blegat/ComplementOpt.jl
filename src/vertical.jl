@@ -1,9 +1,6 @@
 
-const VF = Union{
-    MOI.VectorAffineFunction,
-    MOI.VectorQuadraticFunction,
-    MOI.VectorNonlinearFunction,
-}
+const VF =
+    Union{MOI.VectorAffineFunction,MOI.VectorQuadraticFunction,MOI.VectorNonlinearFunction}
 
 function has_complementarity(model::MOI.ModelLike)
     return any(MOI.get(model, MOI.ListOfConstraintTypesPresent())) do (F, S)
@@ -17,13 +14,16 @@ end
 
 _is_single_variable(::MOI.AbstractScalarFunction) = false
 function _is_single_variable(func::MOI.ScalarAffineFunction)
-    return length(func.terms) == 1 && func.terms[1].coefficient == 1.0 && iszero(func.constant)
+    return length(func.terms) == 1 &&
+           func.terms[1].coefficient == 1.0 &&
+           iszero(func.constant)
 end
 function _is_single_variable(func::MOI.ScalarQuadraticFunction)
-    if (length(func.quadratic_terms) == 0
-        && length(func.affine_terms) == 1
-        && func.affine_terms[1].coefficient == 1.0
-        && iszero(func.constant)
+    if (
+        length(func.quadratic_terms) == 0 &&
+        length(func.affine_terms) == 1 &&
+        func.affine_terms[1].coefficient == 1.0 &&
+        iszero(func.constant)
     )
         return true
     else
@@ -46,10 +46,10 @@ function _parse_complementarity_constraint(fun::MOI.AbstractVectorFunction, n_co
     cc_lhs = MOI.AbstractScalarFunction[]
     cc_rhs = MOI.VariableIndex[]
 
-    for i in 1:n_comp
+    for i = 1:n_comp
         # Parse LHS
         t1 = exprs[i]
-        t2 = exprs[i + n_comp]
+        t2 = exprs[i+n_comp]
         if _is_single_variable(t1)
             push!(cc_lhs, _get_variable(t1))
         else
@@ -62,7 +62,9 @@ function _parse_complementarity_constraint(fun::MOI.AbstractVectorFunction, n_co
             # The RHS should be a variable if we follow MOI's specs
             # TODO: we should decide if we should add support complementarity
             # between expressions (see Issue #2)
-            error("Right-hand-side should be a single variable in complementarity constraints.")
+            error(
+                "Right-hand-side should be a single variable in complementarity constraints.",
+            )
         end
         push!(cc_rhs, _get_variable(t2))
     end
@@ -90,14 +92,14 @@ function reformulate_to_vertical!(model::MOI.ModelLike)
     for (F, S) in contypes
         # Parse only complementarity constraints
         if S == MOI.Complements
-            conindices = MOI.get(model, MOI.ListOfConstraintIndices{F, S}())
+            conindices = MOI.get(model, MOI.ListOfConstraintIndices{F,S}())
             for cidx in conindices
                 fun = MOI.get(model, MOI.ConstraintFunction(), cidx)
                 set = MOI.get(model, MOI.ConstraintSet(), cidx)
                 n_comp = div(set.dimension, 2)
                 if isa(fun, MOI.VectorOfVariables)
                     append!(ind_cc1, fun.variables[1:n_comp])
-                    append!(ind_cc2, fun.variables[n_comp+1:end])
+                    append!(ind_cc2, fun.variables[(n_comp+1):end])
                 elseif isa(fun, VF)
                     # Read each complementarity constraint and get corresponding indices
                     cc_lhs, cc_rhs = _parse_complementarity_constraint(fun, n_comp)
@@ -123,7 +125,9 @@ function reformulate_to_vertical!(model::MOI.ModelLike)
                         end
                     end
                 else
-                    error("Complementary constraints formulated with $(typeof(fun)) are not yet supported")
+                    error(
+                        "Complementary constraints formulated with $(typeof(fun)) are not yet supported",
+                    )
                 end
                 # We delete the complementarity constraints
                 MOI.delete(model, cidx)

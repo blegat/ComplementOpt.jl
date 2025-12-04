@@ -43,9 +43,8 @@ function nonlinear_test_reformulated_model()
     return model
 end
 
-expected_models = Dict(
-    Instances.fletcher_leyffer_ex1_model => fletcher_leyffer_ex1_nonlinear_model,
-)
+expected_models =
+    Dict(Instances.fletcher_leyffer_ex1_model => fletcher_leyffer_ex1_nonlinear_model)
 
 function test_model(model_func)
     model = model_func()
