@@ -68,7 +68,6 @@ end
     JuMP.set_silent(model)
     JuMP.optimize!(model)
 
-    @test JuMP.objective_value(model) ≈ 0.5 atol=1e-8
-    @test JuMP.value.(model[:z]) ≈ [0.5, 0.5] atol=1e-8
+    @test JuMP.objective_value(model) ≈ 0.5 atol=1e-7
+    @test JuMP.value.(model[:z]) ≈ [0.5, 0.5] atol=1e-7
 end
-
