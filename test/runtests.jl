@@ -51,12 +51,11 @@ function test_model(model_func)
     inner = MOI.Utilities.Model{Float64}()
     set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
     MOI.Utilities.attach_optimizer(model)
-    MOI.Utilities.attach_optimizer(backend(model).optimizer.model)
     if haskey(expected_models, model_func)
         expected_func = expected_models[model_func]
         expected = expected_func()
         MOI.Bridges._test_structural_identical(
-            unsafe_backend(model).optimizer,
+            unsafe_backend(model).model,
             backend(expected),
         )
     end
@@ -67,11 +66,10 @@ function test_nonlinear_expr()
     inner = MOI.Utilities.Model{Float64}()
     set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
     MOI.Utilities.attach_optimizer(model)
-    MOI.Utilities.attach_optimizer(backend(model).optimizer.model)
 
     expected = nonlinear_test_reformulated_model()
     MOI.Bridges._test_structural_identical(
-        unsafe_backend(model).optimizer,
+        unsafe_backend(model).model,
         backend(expected),
     )
 end
@@ -97,10 +95,8 @@ end
     ComplementOpt.KanzowSchwarzRelaxation(1e-8),
 ]
     model = Instances.fletcher_leyffer_ex1_model()
-    ind_cc1, ind_cc2 = ComplementOpt.reformulate_to_vertical!(JuMP.backend(model))
-    ComplementOpt.reformulate_as_nonlinear_program!(JuMP.backend(model), relax)
 
-    JuMP.set_optimizer(model, Ipopt.Optimizer)
+    JuMP.set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
     # Need to set the bound relaxation explicitly to 0 for LiuFukushimaRelaxation
     JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
     JuMP.set_optimizer_attribute(model, "bound_push", 1e-1)

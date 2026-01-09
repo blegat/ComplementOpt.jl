@@ -7,6 +7,19 @@ Abstract type to implement any complementarity function ``\\psi``.
 """
 abstract type AbstractComplementarityRelaxation end
 
+struct NonlinearBridge{R} <: MOI.Bridges.Constraint.AbstractBridge
+    constraints::Vector
+end
+
+function MOI.Bridges.Constraint.bridge_constraint(
+    ::Type{NonlinearBridge{R}},
+    model::MOI.ModelLike,
+    func::MOI.VectorOfVariables,
+    set::MOI.Complements,
+) where {R}
+    return NonlinearBridge{R}(reformulate_as_nonlinear_program!(model, R, func, set))
+end
+
 """
     reformulate_as_nonlinear_program!(model::MOI.ModelLike, relaxation::AbstractComplementarityRelaxation)
 
@@ -20,19 +33,9 @@ If the complementarity constraints are not in vertical form, an error is thrown.
 function reformulate_as_nonlinear_program!(
     model::MOI.ModelLike,
     relaxation::AbstractComplementarityRelaxation,
+    fun,
+    set,
 )
-    if !is_vertical(model)
-        error(
-            "Complementarity constraints should be reformulated in vertical form before applying nonlinear reformulation",
-        )
-    end
-
-    cc_cons = MOI.get(
-        model,
-        MOI.ListOfConstraintIndices{MOI.VectorOfVariables,MOI.Complements}(),
-    )[1]
-    fun = MOI.get(model, MOI.ConstraintFunction(), cc_cons)
-    set = MOI.get(model, MOI.ConstraintSet(), cc_cons)
     n_comp = div(set.dimension, 2)
 
     ind_cc = []
@@ -52,7 +55,6 @@ function reformulate_as_nonlinear_program!(
         end
         append!(ind_cc, idc)
     end
-    MOI.delete(model, cc_cons)
     return ind_cc
 end
 
