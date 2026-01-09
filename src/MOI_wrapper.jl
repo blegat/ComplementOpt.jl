@@ -1,11 +1,5 @@
 struct Reformulation <: MOI.AbstractOptimizerAttribute end
 
-struct Bridges
-end
-
-Base.isempty(::Bridges) = true
-MOI.Bridges.Constraint.has_bridges(::Bridges) = false
-
 struct Optimizer{O<:MOI.ModelLike} <: MOI.Bridges.AbstractBridgeOptimizer
     model::O # This need to be called `model` by convention of `AbstractBridgeOptimizer`
     reformulation::AbstractComplementarityRelaxation
@@ -30,15 +24,35 @@ MOI.Bridges.is_bridged(::Optimizer, ::Type{<:MOI.AbstractSet}) = false
 MOI.Bridges.is_bridged(::Optimizer, ::Type{<:MOI.AbstractFunction}) = false
 
 # We only bridge complements constraints
-MOI.Bridges.is_bridged(::Optimizer, ::Type{<:MOI.AbstractFunction}, ::Type{<:MOI.AbstractSet}) = false
-MOI.Bridges.is_bridged(::Optimizer, ::Type{<:MOI.AbstractVectorFunction}, ::Type{<:MOI.Complements}) = true
-MOI.Bridges.supports_bridging_constraint(::Optimizer, ::Type{<:MOI.AbstractVectorFunction}, ::Type{<:MOI.Complements}) = true
-MOI.Bridges.bridge_type(::Optimizer, ::Type{<:MOI.AbstractVectorFunction}, ::Type{<:MOI.Complements}) = VerticalBridge
+MOI.Bridges.is_bridged(
+    ::Optimizer,
+    ::Type{<:MOI.AbstractFunction},
+    ::Type{<:MOI.AbstractSet},
+) = false
+MOI.Bridges.is_bridged(
+    ::Optimizer,
+    ::Type{<:MOI.AbstractVectorFunction},
+    ::Type{<:MOI.Complements},
+) = true
+MOI.Bridges.supports_bridging_constraint(
+    ::Optimizer,
+    ::Type{<:MOI.AbstractVectorFunction},
+    ::Type{<:MOI.Complements},
+) = true
+MOI.Bridges.bridge_type(
+    ::Optimizer,
+    ::Type{<:MOI.AbstractVectorFunction},
+    ::Type{<:MOI.Complements},
+) = VerticalBridge
 
 # It's a bit unfortunate that we're passing the reformulation as type parameter.
 # This means that if the user change the **value** of the tolerance in the reformulation
 # then it will trigger a recompilation of the bridge.
-MOI.Bridges.bridge_type(model::Optimizer, ::Type{<:MOI.VectorOfVariables}, ::Type{<:MOI.Complements}) = NonlinearBridge{model.reformulation}
+MOI.Bridges.bridge_type(
+    model::Optimizer,
+    ::Type{<:MOI.VectorOfVariables},
+    ::Type{<:MOI.Complements},
+) = NonlinearBridge{model.reformulation}
 
 function MOI.Bridges.bridging_cost(b::Optimizer, args...)
     return MOI.Bridges.bridging_cost(MOI.Bridges.bridge_type(b, args...))

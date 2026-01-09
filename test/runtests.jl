@@ -68,10 +68,7 @@ function test_nonlinear_expr()
     MOI.Utilities.attach_optimizer(model)
 
     expected = nonlinear_test_reformulated_model()
-    MOI.Bridges._test_structural_identical(
-        unsafe_backend(model).model,
-        backend(expected),
-    )
+    MOI.Bridges._test_structural_identical(unsafe_backend(model).model, backend(expected))
 end
 
 instances = filter(names(Instances; all = true)) do name
