@@ -43,6 +43,31 @@ function nonlinear_test_reformulated_model()
     return model
 end
 
+function mixed_complementarity_example()
+    model = Model()
+    @variable(model, -1 <= x <= 1)
+    @variable(model, y)
+    @constraint(model, y == -4*x -3)
+    @constraint(model, [y, x] ∈ MOI.Complements(2))
+    return model
+end
+
+function mixed_complementarity_reformulated()
+    model = Model()
+    @variable(model, -1 <= x <= 1)
+    @variable(model, y)
+    @variable(model, yp >= 0)
+    @variable(model, yn >= 0)
+    @variable(model, xp >= 0)
+    @variable(model, xn >= 0)
+    @constraint(model, x - xp == -1)
+    @constraint(model, x + xn == 1)
+    @constraint(model, y == yp - yn)
+    @constraint(model, 4x + y == -3)
+    @constraint(model, [yp, yn, xp, xn] ∈ MOI.Complements(4))
+    return model
+end
+
 expected_models =
     Dict(Instances.fletcher_leyffer_ex1_model => fletcher_leyffer_ex1_nonlinear_model)
 
@@ -83,6 +108,19 @@ end
 
 @testset "Unit-tests" begin
     test_nonlinear_expr()
+end
+
+@testset "Complementarity constraints reformulation" begin
+    # Test reformulation of mixed-complementarity constraints
+    model = mixed_complementarity_example()
+    ComplementOpt.reformulate_to_standard_form!(JuMP.backend(model))
+    # Reference model where the constraints have been manually reformulated in standard form
+    model_cc = mixed_complementarity_reformulated()
+    # Test that both problems match.
+    MOI.Bridges._test_structural_identical(
+        backend(model),
+        backend(model_cc),
+    )
 end
 
 @testset "Relaxation method $(relax)" for relax in [
