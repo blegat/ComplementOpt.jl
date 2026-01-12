@@ -1,6 +1,6 @@
 struct Reformulation <: MOI.AbstractOptimizerAttribute end
 
-struct Optimizer{O<:MOI.ModelLike} <: MOI.Bridges.AbstractBridgeOptimizer
+mutable struct Optimizer{O<:MOI.ModelLike} <: MOI.Bridges.AbstractBridgeOptimizer
     model::O # This need to be called `model` by convention of `AbstractBridgeOptimizer`
     reformulation::AbstractComplementarityRelaxation
     constraint_map::MOI.Bridges.Constraint.Map
@@ -11,6 +11,8 @@ struct Optimizer{O<:MOI.ModelLike} <: MOI.Bridges.AbstractBridgeOptimizer
             model,
             ScholtesRelaxation(0.0),
             MOI.Bridges.Constraint.Map(),
+            Dict{MOI.ConstraintIndex,String}(),
+            nothing,
         )
     end
 end
