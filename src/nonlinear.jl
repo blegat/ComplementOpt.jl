@@ -86,7 +86,7 @@ function _relax_complementarity_lower_bound!(
     lb2,
     ub2,
 )
-    lb1, ub1 = MOIU.get_bounds(model, Float64, x1)
+    lb1, _ = MOIU.get_bounds(model, Float64, x1)
     if isinf(lb1)
         MOI.add_constraint(model, x1, MOI.GreaterThan(0.0))
     else
@@ -106,9 +106,9 @@ function _relax_complementarity_upper_bound!(
     lb2,
     ub2,
 )
-    lb1, ub1 = MOIU.get_bounds(model, Float64, x1)
+    _, ub1 = MOIU.get_bounds(model, Float64, x1)
     if isinf(ub1)
-        MOI.add_constraint(model, x1, MOI.GreaterThan(0.0))
+        MOI.add_constraint(model, x1, MOI.LessThan(0.0))
     else
         @assert ub1 == 0.0 # ensure we follow MOI's convention
         # TODO: what should we do if lb1 is finite?
@@ -127,6 +127,7 @@ function _relax_complementarity_range!(
     ub2,
 )
     lb1, ub1 = MOIU.get_bounds(model, Float64, x1)
+    @assert isinf(lb1) && isinf(ub1)
     idc1 = MOI.add_constraint(model, x1 * (x2 - lb2), MOI.LessThan(relaxation.tau))
     idc2 = MOI.add_constraint(model, x1 * (x2 - ub2), MOI.LessThan(relaxation.tau))
     return [idc1, idc2]
