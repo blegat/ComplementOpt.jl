@@ -12,7 +12,7 @@ const MACMPEC_SOLUTIONS = Dict{Symbol,Float64}(
     :ralph_2_model => 0.0,
     :scale_1_model => 1.0,
     :scholtes4_model => 0.0, # Here, we found a different solution than in MacMPEC (3.07336e-7)
-    :water_net_model => 934.8621, # Solution reported is slightly worse than in MacMPEC (929.169)
+    :water_net_model => 930.6687, # Solution reported is slightly worse than in MacMPEC (929.169)
 )
 
 # Ex. (2.2) from "Local convergence of SQP methods for MPECs".
@@ -375,8 +375,8 @@ function water_net_model()
     model = Model()
 
     # N.B. : solution found is highly sensitive to the initial values of (qp, qn)
-    @variable(model, 0 <= qp[arcs], start=10.0)
-    @variable(model, 0 <= qn[arcs], start=10.0)
+    @variable(model, 0 <= qp[arcs])
+    @variable(model, 0 <= qn[arcs])
     @variable(model, dmin <= d[arcs] <= dmax, start=davg)
     @variable(model, h[i in nodes], start=hl[i] + 5.0, lower_bound=hl[i], upper_bound=100)
     @variable(model, 0 <= s[i in reservoirs] <= supply[i], start=rr*supply[i])
