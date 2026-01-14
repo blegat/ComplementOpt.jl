@@ -44,7 +44,7 @@ function nonlinear_test_reformulated_model()
 end
 
 # Variable in the left-hand-side should not have two bounds
-function mpcc_mispecified_1()
+function test_vertical_mispecified_1()
     model = Model()
     @variable(model, 0.0 <= x <= 1.0)
     @variable(model, 0.0 <= y)
@@ -52,7 +52,8 @@ function mpcc_mispecified_1()
     return model
 end
 
-function mpcc_mispecified_2()
+# Variable in the right-hand-side should not be an expression
+function test_vertical_mispecified_2()
     model = Model()
     @variable(model, 0.0 <= x)
     @variable(model, 0.0 <= y)
@@ -60,7 +61,7 @@ function mpcc_mispecified_2()
     return model
 end
 
-function test_mpcc_vertical()
+function test_vertical_formulation()
     model = Model()
     # Case 1: LHS is already a variable (do nothing)
     @variable(model, x1)
@@ -74,6 +75,41 @@ function test_mpcc_vertical()
     @variable(model, x3)
     @variable(model, 0.0 <= y3)
     @constraint(model, [1.0*x3, y3] ∈ MOI.Complements(2))
+    return model
+end
+
+function test_nonlinear_reformulation()
+    model = Model()
+    # Case 1: Complementarity defined as lower-bound on RHS
+    @variable(model, x1)
+    @variable(model, 0.0 <= y1)
+    @constraint(model, [x1, y1] ∈ MOI.Complements(2))
+    # Case 2: Complementarity defined as upper-bound on RHS
+    @variable(model, x2)
+    @variable(model, y2 <= 1.0)
+    @constraint(model, [x2, y2] ∈ MOI.Complements(2))
+    # Case 3: Mixed-complementarity
+    @variable(model, x3)
+    @variable(model, 0.0 <= y3 <= 1.0)
+    @constraint(model, [x3, y3] ∈ MOI.Complements(2))
+    return model
+end
+
+# LHS has a non-trivial lower-bound
+function test_nonlinear_mispecified_1()
+    model = Model()
+    @variable(model, 1.0 <= x1)
+    @variable(model, 0.0 <= y1)
+    @constraint(model, [x1, y1] ∈ MOI.Complements(2))
+    return model
+end
+
+# RHS is unbounded
+function test_nonlinear_mispecified_2()
+    model = Model()
+    @variable(model, x1)
+    @variable(model, y1)
+    @constraint(model, [x1, y1] ∈ MOI.Complements(2))
     return model
 end
 
@@ -106,14 +142,30 @@ function test_nonlinear_expr()
 end
 
 @testset "Test vertical formulation" begin
-    model = test_mpcc_vertical()
+    model = test_vertical_formulation()
     set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
     MOI.Utilities.attach_optimizer(model)
-    # MOI.instantiate(model)
 
-    model = mpcc_mispecified_2()
+    model = test_vertical_mispecified_2()
     set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
     @test_throws Exception MOI.Utilities.attach_optimizer(model)
+end
+
+@testset "Nonlinear reformulation $(relax)" for relax in [
+    ComplementOpt.ScholtesRelaxation(0.0),
+    ComplementOpt.FischerBurmeisterRelaxation(1e-8),
+    ComplementOpt.LiuFukushimaRelaxation(1e-8),
+    ComplementOpt.KanzowSchwarzRelaxation(1e-8),
+]
+    model = test_nonlinear_reformulation()
+    set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
+    MOI.Utilities.attach_optimizer(model)
+
+    for test_func in (test_nonlinear_mispecified_1, test_vertical_mispecified_2)
+        model = test_func()
+        set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
+        @test_throws Exception MOI.Utilities.attach_optimizer(model)
+    end
 end
 
 instances = filter(names(Instances; all = true)) do name
