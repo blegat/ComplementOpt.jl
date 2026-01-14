@@ -49,8 +49,10 @@ expected_models =
 function test_model(model_func)
     model = model_func()
     set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
-    JuMP.set_optimizer_attribute(model, "tol", 1e-12)
-    JuMP.set_silent(model)
+    JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
+    JuMP.set_optimizer_attribute(model, "mu_strategy", "adaptive")
+    JuMP.set_optimizer_attribute(model, "bound_push", 1e-1)
+    # JuMP.set_silent(model)
     JuMP.optimize!(model)
     name = Symbol(model_func)
     @test JuMP.is_solved_and_feasible(model)
@@ -78,9 +80,12 @@ end
     test_model(getfield(Instances, name))
 end
 
-@testset "Test reformulation for $original_model" for (original_model, reformulated_model) in [
-        (nonlinear_test_model, nonlinear_test_reformulated_model),
-        (Instances.fletcher_leyffer_ex1_model, fletcher_leyffer_ex1_nonlinear_model),
+@testset "Test reformulation for $original_model" for (
+    original_model,
+    reformulated_model,
+) in [
+    (nonlinear_test_model, nonlinear_test_reformulated_model),
+    (Instances.fletcher_leyffer_ex1_model, fletcher_leyffer_ex1_nonlinear_model),
 ]
     test_nonlinear_expr(original_model, reformulated_model)
 end

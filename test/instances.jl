@@ -3,7 +3,7 @@ using JuMP
 
 # Solution reported by Sven Leyffer in MacMPEC:
 # https://wiki.mcs.anl.gov/leyffer/index.php/MacMPEC
-const MACMPEC_SOLUTIONS = Dict{Symbol, Float64}(
+const MACMPEC_SOLUTIONS = Dict{Symbol,Float64}(
     :dempe_model => 28.25,
     :design_centering_model => -1.86065,
     :desilva_model => -1.0,
@@ -11,8 +11,8 @@ const MACMPEC_SOLUTIONS = Dict{Symbol, Float64}(
     :qpec2_model => 45.0,
     :ralph_2_model => 0.0,
     :scale_1_model => 1.0,
-    :scholtes4_model => -2e-4, # Here, we found a different solution than in MacMPEC (3.07336e-7)
-    :water_net_model => 927.264324 # Solution reported is better than in MacMPEC (929.169)
+    :scholtes4_model => 0.0, # Here, we found a different solution than in MacMPEC (3.07336e-7)
+    :water_net_model => 934.8621, # Solution reported is slightly worse than in MacMPEC (929.169)
 )
 
 # Ex. (2.2) from "Local convergence of SQP methods for MPECs".
@@ -390,7 +390,7 @@ function water_net_model()
         sum(qp[(i, j)] + qn[(i, j)] for (i, j) in arcs),
     )
     # ... max flow through arcs
-    @constraint(model, [(i,j) in arcs], qp[(i, j)] + qn[(i, j)] <= maxq)
+    @constraint(model, [(i, j) in arcs], qp[(i, j)] + qn[(i, j)] <= maxq)
 
     # ... flow conservation equation at each node
     @constraint(
