@@ -62,3 +62,16 @@ end
 
 # We may have a chain of bridges
 MOI.Bridges.recursive_model(b::Optimizer) = b
+
+# Relaxation attribute
+struct RelaxationMethod <: MOI.AbstractOptimizerAttribute end
+
+MOI.supports(::Optimizer, ::RelaxationMethod) = true
+
+function MOI.set(model::Optimizer, ::RelaxationMethod, reformulation::AbstractComplementarityRelaxation)
+    model.reformulation = reformulation
+    return
+end
+
+MOI.Utilities.map_indices(::Function, relax::AbstractComplementarityRelaxation) = relax
+

@@ -43,6 +43,40 @@ function nonlinear_test_reformulated_model()
     return model
 end
 
+# Variable in the left-hand-side should not have two bounds
+function mpcc_mispecified_1()
+    model = Model()
+    @variable(model, 0.0 <= x <= 1.0)
+    @variable(model, 0.0 <= y)
+    @constraint(model, [x, y] ∈ MOI.Complements(2))
+    return model
+end
+
+function mpcc_mispecified_2()
+    model = Model()
+    @variable(model, 0.0 <= x)
+    @variable(model, 0.0 <= y)
+    @constraint(model, [x, 1.0*y + x] ∈ MOI.Complements(2))
+    return model
+end
+
+function test_mpcc_vertical()
+    model = Model()
+    # Case 1: LHS is already a variable (do nothing)
+    @variable(model, x1)
+    @variable(model, 0.0 <= y1)
+    @constraint(model, [x1, y1] ∈ MOI.Complements(2))
+    # Case 2: RHS is unbounded (convert LHS to equality)
+    @variable(model, x2)
+    @variable(model, y2)
+    @constraint(model, [1.0*x2, y2] ∈ MOI.Complements(2))
+    # Case 3: LHS is a ScalarAffineFunction with a single variable
+    @variable(model, x3)
+    @variable(model, 0.0 <= y3)
+    @constraint(model, [1.0*x3, y3] ∈ MOI.Complements(2))
+    return model
+end
+
 expected_models =
     Dict(Instances.fletcher_leyffer_ex1_model => fletcher_leyffer_ex1_nonlinear_model)
 
@@ -71,6 +105,17 @@ function test_nonlinear_expr()
     MOI.Bridges._test_structural_identical(unsafe_backend(model).model, backend(expected))
 end
 
+@testset "Test vertical formulation" begin
+    model = test_mpcc_vertical()
+    set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
+    MOI.Utilities.attach_optimizer(model)
+    # MOI.instantiate(model)
+
+    model = mpcc_mispecified_2()
+    set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
+    @test_throws Exception MOI.Utilities.attach_optimizer(model)
+end
+
 instances = filter(names(Instances; all = true)) do name
     # The function types start with `#`
     s = String(name)
@@ -94,12 +139,13 @@ end
     model = Instances.fletcher_leyffer_ex1_model()
 
     JuMP.set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
+    MOI.set(model, ComplementOpt.RelaxationMethod(), relax)
     # Need to set the bound relaxation explicitly to 0 for LiuFukushimaRelaxation
     JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
-    JuMP.set_optimizer_attribute(model, "bound_push", 1e-1)
     JuMP.set_silent(model)
     JuMP.optimize!(model)
 
+    @test JuMP.is_solved_and_feasible(model)
     @test JuMP.objective_value(model) ≈ 0.5 atol=1e-7
     @test JuMP.value.(model[:z]) ≈ [0.5, 0.5] atol=1e-7
 end
