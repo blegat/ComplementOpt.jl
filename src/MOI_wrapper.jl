@@ -68,10 +68,13 @@ struct RelaxationMethod <: MOI.AbstractOptimizerAttribute end
 
 MOI.supports(::Optimizer, ::RelaxationMethod) = true
 
-function MOI.set(model::Optimizer, ::RelaxationMethod, reformulation::AbstractComplementarityRelaxation)
+function MOI.set(
+    model::Optimizer,
+    ::RelaxationMethod,
+    reformulation::AbstractComplementarityRelaxation,
+)
     model.reformulation = reformulation
     return
 end
 
 MOI.Utilities.map_indices(::Function, relax::AbstractComplementarityRelaxation) = relax
-

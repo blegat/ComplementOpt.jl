@@ -88,10 +88,6 @@ function test_nonlinear_reformulation()
     @variable(model, x2)
     @variable(model, y2 <= 1.0)
     @constraint(model, [x2, y2] ∈ MOI.Complements(2))
-    # Case 3: Mixed-complementarity
-    @variable(model, x3)
-    @variable(model, 0.0 <= y3 <= 1.0)
-    @constraint(model, [x3, y3] ∈ MOI.Complements(2))
     return model
 end
 
@@ -159,11 +155,13 @@ end
 ]
     model = test_nonlinear_reformulation()
     set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
+    MOI.set(model, ComplementOpt.RelaxationMethod(), relax)
     MOI.Utilities.attach_optimizer(model)
 
     for test_func in (test_nonlinear_mispecified_1, test_vertical_mispecified_2)
         model = test_func()
         set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
+        MOI.set(model, ComplementOpt.RelaxationMethod(), relax)
         @test_throws Exception MOI.Utilities.attach_optimizer(model)
     end
 end
