@@ -204,7 +204,7 @@ function _relax_complementarity_upper_bound!(
 )
     lb1, ub1 = MOIU.get_bounds(model, Float64, x1)
     if isinf(ub1)
-        MOI.add_constraint(model, x1, MOI.GreaterThan(0.0))
+        MOI.add_constraint(model, x1, MOI.LessThan(0.0))
     else
         @assert ub1 == 0.0 # ensure we follow MOI's convention
         # TODO: what should we do if lb1 is finite?
@@ -264,6 +264,10 @@ function _relax_complementarity_lower_bound!(
     lb2,
     ub2,
 )
+    # Ensure we respect MOI's specs
+    lb1, _ = MOIU.get_bounds(model, Float64, x1)
+    @assert isinf(lb1) || iszero(lb1)
+
     idc1 = MOI.add_constraint(model, x1 * (x2 - lb2), MOI.LessThan(relaxation.epsilon^2))
     idc2 = MOI.add_constraint(
         model,
@@ -287,6 +291,10 @@ function _relax_complementarity_upper_bound!(
     lb2,
     ub2,
 )
+    # Ensure we respect MOI's specs
+    _, ub1 = MOIU.get_bounds(model, Float64, x1)
+    @assert isinf(ub1) || iszero(ub1)
+
     idc1 = MOI.add_constraint(model, x1 * (x2 - ub2), MOI.LessThan(relaxation.epsilon^2))
     idc2 = MOI.add_constraint(
         model,
@@ -371,14 +379,14 @@ function _relax_complementarity_upper_bound!(
 )
     lb1, ub1 = MOIU.get_bounds(model, Float64, x1)
     if isinf(ub1)
-        MOI.add_constraint(model, x1, MOI.GreaterThan(0.0))
+        MOI.add_constraint(model, x1, MOI.LessThan(0.0))
     else
         @assert ub1 == 0.0 # ensure we follow MOI's convention
         # TODO: what should we do if lb1 is finite?
     end
     idc = MOI.add_constraint(
         model,
-        _kanzow_schwarz_relaxation(-x1, ub2 - x2, relaxation.epsilon),
+        _kanzow_schwarz_relaxation(-1.0*x1, ub2 - x2, relaxation.epsilon),
         MOI.LessThan(0.0),
     )
     return [idc]

@@ -77,16 +77,13 @@ function _parse_complementarity_constraint(fun::MOI.AbstractVectorFunction, n_co
 end
 
 """
-    reformulate_to_vertical!(model::MOI.ModelLike)
+    reformulate_to_vertical!(model::MOI.ModelLike, fun, set)
 
 Factorize all the complementarity constraints in `model` and formulate
 an equivalent model in vertical form. The complementarity constraints involving
 expressions are rewritten with a slack.
 
 Once reformulated, the complementarity constraints involve only single variables.
-
-Return a `Tuple{Vector{MOI.VariableIndex}, Vector{MOI.VariableIndex}}` storing the indexes
-of the variables in the left-hand-side and the right-hand-side of each complementarity.
 
 """
 function reformulate_to_vertical!(model::MOI.ModelLike, fun, set)
