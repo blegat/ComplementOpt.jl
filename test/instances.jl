@@ -1,6 +1,20 @@
 
 using JuMP
 
+# Solution reported by Sven Leyffer in MacMPEC:
+# https://wiki.mcs.anl.gov/leyffer/index.php/MacMPEC
+const MACMPEC_SOLUTIONS = Dict{Symbol,Float64}(
+    :dempe_model => 28.25,
+    :design_centering_model => -1.86065,
+    :desilva_model => -1.0,
+    :gauvin_model => 20.0,
+    :qpec2_model => 45.0,
+    :ralph_2_model => 0.0,
+    :scale_1_model => 1.0,
+    :scholtes4_model => 0.0, # Here, we found a different solution than in MacMPEC (3.07336e-7)
+    :water_net_model => 930.6687, # Solution reported is slightly worse than in MacMPEC (929.169)
+)
+
 # Ex. (2.2) from "Local convergence of SQP methods for MPECs".
 # Solution is (0.5, 0.5), basic multipliers is (0, 1, 0)
 function fletcher_leyffer_ex1_model()
@@ -360,8 +374,9 @@ function water_net_model()
 
     model = Model()
 
-    @variable(model, 0 <= qp[arcs] <= maxq)
-    @variable(model, 0 <= qn[arcs] <= maxq)
+    # N.B. : solution found is highly sensitive to the initial values of (qp, qn)
+    @variable(model, 0 <= qp[arcs])
+    @variable(model, 0 <= qn[arcs])
     @variable(model, dmin <= d[arcs] <= dmax, start=davg)
     @variable(model, h[i in nodes], start=hl[i] + 5.0, lower_bound=hl[i], upper_bound=100)
     @variable(model, 0 <= s[i in reservoirs] <= supply[i], start=rr*supply[i])
@@ -374,6 +389,9 @@ function water_net_model()
         dprc * sum(dist[(i, j)] * d[(i, j)]^cpow for (i, j) in arcs) +
         sum(qp[(i, j)] + qn[(i, j)] for (i, j) in arcs),
     )
+    # ... max flow through arcs
+    @constraint(model, [(i, j) in arcs], qp[(i, j)] + qn[(i, j)] <= maxq)
+
     # ... flow conservation equation at each node
     @constraint(
         model,

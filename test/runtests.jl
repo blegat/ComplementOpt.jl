@@ -164,26 +164,25 @@ expected_models =
 
 function test_model(model_func)
     model = model_func()
-    inner = MOI.Utilities.Model{Float64}()
-    set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
-    MOI.Utilities.attach_optimizer(model)
-    if haskey(expected_models, model_func)
-        expected_func = expected_models[model_func]
-        expected = expected_func()
-        MOI.Bridges._test_structural_identical(
-            unsafe_backend(model).model,
-            backend(expected),
-        )
+    set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
+    JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
+    JuMP.set_optimizer_attribute(model, "mu_strategy", "adaptive")
+    JuMP.set_optimizer_attribute(model, "bound_push", 1e-1)
+    JuMP.set_silent(model)
+    JuMP.optimize!(model)
+    name = Symbol(model_func)
+    @test JuMP.is_solved_and_feasible(model)
+    if haskey(Instances.MACMPEC_SOLUTIONS, name)
+        @test JuMP.objective_value(model) ≈ Instances.MACMPEC_SOLUTIONS[name] rtol=1e-4 atol=1e-4
     end
 end
 
-function test_nonlinear_expr()
-    model = nonlinear_test_model()
+function test_nonlinear_expr(original_model, reformulated_model)
+    model = original_model()
     inner = MOI.Utilities.Model{Float64}()
     set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
     MOI.Utilities.attach_optimizer(model)
-
-    expected = nonlinear_test_reformulated_model()
+    expected = reformulated_model()
     MOI.Bridges._test_structural_identical(unsafe_backend(model).model, backend(expected))
 end
 
@@ -215,8 +214,14 @@ end
     test_model(getfield(Instances, name))
 end
 
-@testset "Unit-tests" begin
-    test_nonlinear_expr()
+@testset "Test reformulation for $original_model" for (
+    original_model,
+    reformulated_model,
+) in [
+    (nonlinear_test_model, nonlinear_test_reformulated_model),
+    (Instances.fletcher_leyffer_ex1_model, fletcher_leyffer_ex1_nonlinear_model),
+]
+    test_nonlinear_expr(original_model, reformulated_model)
 end
 
 @testset "Relaxation method: $(relax)" for relax in [
