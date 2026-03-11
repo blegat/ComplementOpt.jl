@@ -78,3 +78,24 @@ function MOI.set(
 end
 
 MOI.Utilities.map_indices(::Function, relax::AbstractComplementarityRelaxation) = relax
+
+function _additional_arguments(model::Optimizer, ::Type{NonlinearBridge})
+    # Create a 1-element tuple since it is splatted in `add_bridged_constraint`
+    return (model.reformulation,)
+end
+
+# TODO it would be nice if MOI was defining this `MOI.Bridges.additional_arguments` function and
+#      already had this implementation of `add_bridged_constraint` so that I don't have to reimplement it
+function MOI.Bridges.add_bridged_constraint(b, BridgeType, f, s)
+    bridge = Constraint.bridge_constraint(BridgeType, recursive_model(b), f, s, _additional_arguments(BridgeType, b)...)
+    # The rest is copy-pasted from the default implementation of `add_bridged_constraint` in MOI
+    ci = Constraint.add_key_for_bridge(
+        Constraint.bridges(b)::Constraint.Map,
+        bridge,
+        f,
+        s,
+        !Base.Fix1(MOI.is_valid, Variable.bridges(b)),
+    )
+    Variable.register_context(Variable.bridges(b), ci)
+    return ci
+end

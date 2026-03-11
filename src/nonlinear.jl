@@ -7,17 +7,21 @@ Abstract type to implement any complementarity function ``\\psi``.
 """
 abstract type AbstractComplementarityRelaxation end
 
-struct NonlinearBridge{R} <: MOI.Bridges.Constraint.AbstractBridge
+struct NonlinearBridge <: MOI.Bridges.Constraint.AbstractBridge
     constraints::Vector
 end
 
 function MOI.Bridges.Constraint.bridge_constraint(
-    ::Type{NonlinearBridge{R}},
+    ::Type{NonlinearBridge},
     model::MOI.ModelLike,
     func::MOI.VectorOfVariables,
     set::MOI.Complements,
-) where {R}
-    return NonlinearBridge{R}(reformulate_as_nonlinear_program!(model, R, func, set))
+    # Only `ComplementOpt.Optimizer` supports setting custom bridge arguments
+    # so the default will be used when the bridge is added for instance to
+    # `MOI.Bridges.LazyBridgeOptimizer`
+    reformulation::AbstractComplementarityRelaxation = ScholtesRelaxation(0.0),
+)
+    return NonlinearBridge(reformulate_as_nonlinear_program!(model, R, func, set))
 end
 
 """
