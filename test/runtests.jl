@@ -282,7 +282,12 @@ end
 ]
     @testset "Solve NCP problem $(func)" for func in [simple_lp_1] #, simple_lp_2]
         model, vars, sol = func()
-        JuMP.set_optimizer(model, () -> ComplementOpt.Optimizer(MOI.instantiate(Ipopt.Optimizer, with_cache_type=Float64)))
+        JuMP.set_optimizer(
+            model,
+            () -> ComplementOpt.Optimizer(
+                MOI.instantiate(Ipopt.Optimizer, with_cache_type = Float64),
+            ),
+        )
         MOI.set(model, ComplementOpt.RelaxationMethod(), relax)
         JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
         JuMP.set_silent(model)

@@ -89,7 +89,13 @@ end
 # TODO it would be nice if MOI was defining this `MOI.Bridges.additional_arguments` function and
 #      already had this implementation of `add_bridged_constraint` so that I don't have to reimplement it
 function MOI.Bridges.add_bridged_constraint(b::Optimizer, BridgeType, f, s)
-    bridge = MOI.Bridges.Constraint.Constraint.bridge_constraint(BridgeType, MOI.Bridges.recursive_model(b), f, s, _additional_arguments(b, BridgeType)...)
+    bridge = MOI.Bridges.Constraint.Constraint.bridge_constraint(
+        BridgeType,
+        MOI.Bridges.recursive_model(b),
+        f,
+        s,
+        _additional_arguments(b, BridgeType)...,
+    )
     # The rest is copy-pasted from the default implementation of `add_bridged_constraint` in MOI
     ci = MOI.Bridges.Constraint.add_key_for_bridge(
         MOI.Bridges.Constraint.bridges(b)::MOI.Bridges.Constraint.Map,

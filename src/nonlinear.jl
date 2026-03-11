@@ -21,7 +21,9 @@ function MOI.Bridges.Constraint.bridge_constraint(
     # `MOI.Bridges.LazyBridgeOptimizer`
     reformulation::AbstractComplementarityRelaxation = ScholtesRelaxation(0.0),
 )
-    return NonlinearBridge(reformulate_as_nonlinear_program!(model, reformulation, func, set))
+    return NonlinearBridge(
+        reformulate_as_nonlinear_program!(model, reformulation, func, set),
+    )
 end
 
 """
