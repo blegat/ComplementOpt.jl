@@ -54,7 +54,7 @@ MOI.Bridges.bridge_type(
     model::Optimizer,
     ::Type{<:MOI.VectorOfVariables},
     ::Type{<:MOI.Complements},
-) = NonlinearBridge{model.reformulation}
+) = NonlinearBridge
 
 function MOI.Bridges.bridging_cost(b::Optimizer, args...)
     return MOI.Bridges.bridging_cost(MOI.Bridges.bridge_type(b, args...))
@@ -78,3 +78,32 @@ function MOI.set(
 end
 
 MOI.Utilities.map_indices(::Function, relax::AbstractComplementarityRelaxation) = relax
+
+_additional_arguments(::Optimizer, ::Type) = tuple()
+
+function _additional_arguments(model::Optimizer, ::Type{NonlinearBridge})
+    # Create a 1-element tuple since it is splatted in `add_bridged_constraint`
+    return (model.reformulation,)
+end
+
+# TODO it would be nice if MOI was defining this `MOI.Bridges.additional_arguments` function and
+#      already had this implementation of `add_bridged_constraint` so that I don't have to reimplement it
+function MOI.Bridges.add_bridged_constraint(b::Optimizer, BridgeType, f, s)
+    bridge = MOI.Bridges.Constraint.Constraint.bridge_constraint(
+        BridgeType,
+        MOI.Bridges.recursive_model(b),
+        f,
+        s,
+        _additional_arguments(b, BridgeType)...,
+    )
+    # The rest is copy-pasted from the default implementation of `add_bridged_constraint` in MOI
+    ci = MOI.Bridges.Constraint.add_key_for_bridge(
+        MOI.Bridges.Constraint.bridges(b)::MOI.Bridges.Constraint.Map,
+        bridge,
+        f,
+        s,
+        !Base.Fix1(MOI.is_valid, MOI.Bridges.Variable.bridges(b)),
+    )
+    MOI.Bridges.Variable.register_context(MOI.Bridges.Variable.bridges(b), ci)
+    return ci
+end

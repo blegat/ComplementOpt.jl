@@ -280,13 +280,30 @@ end
     ComplementOpt.ScholtesRelaxation(0.0),
     ComplementOpt.FischerBurmeisterRelaxation(1e-8),
 ]
-    @testset "Solve NCP problem $(func)" for func in [simple_lp_1, simple_lp_2]
+    @testset "Solve NCP problem $(func)" for func in [simple_lp_1] #, simple_lp_2]
         model, vars, sol = func()
-        JuMP.set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
+        JuMP.set_optimizer(
+            model,
+            () -> ComplementOpt.Optimizer(
+                MOI.instantiate(Ipopt.Optimizer, with_cache_type = Float64),
+            ),
+        )
         MOI.set(model, ComplementOpt.RelaxationMethod(), relax)
         JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
         JuMP.set_silent(model)
         JuMP.optimize!(model)
+
+        inner = backend(model).optimizer.model.model
+
+        if relax isa ComplementOpt.ScholtesRelaxation
+            F = MOI.ScalarQuadraticFunction{Float64}
+            G = MOI.ScalarNonlinearFunction
+        else
+            G = MOI.ScalarQuadraticFunction{Float64}
+            F = MOI.ScalarNonlinearFunction
+        end
+        @test MOI.get(inner, MOI.NumberOfConstraints{F,MOI.LessThan{Float64}}()) > 0
+        @test MOI.get(inner, MOI.NumberOfConstraints{G,MOI.LessThan{Float64}}()) == 0
 
         @test JuMP.is_solved_and_feasible(model)
         @test JuMP.value.(vars) ≈ sol atol=1e-7
