@@ -309,3 +309,28 @@ end
         @test JuMP.value.(vars) ≈ sol atol=1e-7
     end
 end
+
+@testset "Per-constraint reformulation" begin
+    model = Model()
+    @variable(model, x1)
+    @variable(model, 0.0 <= y1)
+    c1 = @constraint(model, x1 ⟂ y1)
+    @variable(model, x2)
+    @variable(model, 0.0 <= y2)
+    c2 = @constraint(model, x2 ⟂ y2)
+    @objective(model, Min, (x1 - 1)^2 + y1^2 + (x2 - 1)^2 + y2^2)
+    JuMP.set_optimizer(
+        model,
+        () -> ComplementOpt.Optimizer(
+            MOI.instantiate(Ipopt.Optimizer, with_cache_type = Float64),
+        ),
+    )
+    # Default is Scholtes
+    MOI.set(model, ComplementOpt.RelaxationMethod(), ComplementOpt.ScholtesRelaxation(0.0))
+    # Override c1 with FischerBurmeister
+    MOI.set(model, ComplementOpt.Reformulation(), c1, ComplementOpt.FischerBurmeisterRelaxation(1e-8))
+    JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
+    JuMP.set_silent(model)
+    JuMP.optimize!(model)
+    @test JuMP.is_solved_and_feasible(model)
+end

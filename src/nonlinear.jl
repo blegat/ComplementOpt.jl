@@ -9,6 +9,8 @@ abstract type AbstractComplementarityRelaxation end
 
 struct NonlinearBridge <: MOI.Bridges.Constraint.AbstractBridge
     constraints::Vector
+    func::MOI.VectorOfVariables
+    set::MOI.Complements
 end
 
 function MOI.Bridges.Constraint.bridge_constraint(
@@ -23,6 +25,8 @@ function MOI.Bridges.Constraint.bridge_constraint(
 )
     return NonlinearBridge(
         reformulate_as_nonlinear_program!(model, reformulation, func, set),
+        func,
+        set,
     )
 end
 
