@@ -354,4 +354,39 @@ end
     dummy_ci = MOI.ConstraintIndex{MOI.VectorOfVariables,MOI.Complements}(0)
     @test MOI.get(opt, ComplementOpt.ComplementarityReformulation(), dummy_ci) isa
           ComplementOpt.ScholtesRelaxation
+    # Test get through the LazyBridgeOptimizer
+    lazy = JuMP.backend(model).optimizer
+    ci_mapped = first(
+        MOI.get(
+            lazy,
+            MOI.ListOfConstraintIndices{MOI.VectorOfVariables,MOI.Complements}(),
+        ),
+    )
+    @test MOI.get(lazy, ComplementOpt.ComplementarityReformulation(), ci_mapped) isa
+          ComplementOpt.FischerBurmeisterRelaxation
+end
+
+@testset "Per-constraint reformulation with VerticalBridge" begin
+    # Use an expression LHS so that the constraint goes through VerticalBridge
+    model = Model()
+    @variable(model, x >= 0.0)
+    @variable(model, y >= 0.0)
+    c = @constraint(model, [x + y, y] ∈ MOI.Complements(2))
+    @objective(model, Min, x^2 + y^2)
+    JuMP.set_optimizer(
+        model,
+        () -> ComplementOpt.Optimizer(
+            MOI.instantiate(Ipopt.Optimizer, with_cache_type = Float64),
+        ),
+    )
+    MOI.set(
+        model,
+        ComplementOpt.ComplementarityReformulation(),
+        c,
+        ComplementOpt.FischerBurmeisterRelaxation(1e-8),
+    )
+    JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
+    JuMP.set_silent(model)
+    JuMP.optimize!(model)
+    @test JuMP.is_solved_and_feasible(model)
 end
