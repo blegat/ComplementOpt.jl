@@ -1,4 +1,5 @@
-struct Reformulation <: MOI.AbstractConstraintAttribute end
+struct Reformulation <: MOI.AbstractOptimizerAttribute end
+struct ConstraintReformulation <: MOI.AbstractConstraintAttribute end
 
 mutable struct Optimizer{O<:MOI.ModelLike} <: MOI.Bridges.AbstractBridgeOptimizer
     model::O # This need to be called `model` by convention of `AbstractBridgeOptimizer`
@@ -65,14 +66,15 @@ end
 # We may have a chain of bridges
 MOI.Bridges.recursive_model(b::Optimizer) = b
 
-# Relaxation attribute
+# Model-wide default reformulation attribute
 struct RelaxationMethod <: MOI.AbstractOptimizerAttribute end
 
 MOI.supports(::Optimizer, ::RelaxationMethod) = true
+MOI.supports(::Optimizer, ::Reformulation) = true
 
 function MOI.set(
     model::Optimizer,
-    ::RelaxationMethod,
+    ::Union{RelaxationMethod,Reformulation},
     reformulation::AbstractComplementarityRelaxation,
 )
     model.reformulation = reformulation
@@ -81,9 +83,10 @@ end
 
 MOI.Utilities.map_indices(::Function, relax::AbstractComplementarityRelaxation) = relax
 
+# Per-constraint reformulation attribute
 function MOI.supports(
     ::Optimizer,
-    ::Reformulation,
+    ::ConstraintReformulation,
     ::Type{<:MOI.ConstraintIndex{<:MOI.AbstractVectorFunction,<:MOI.Complements}},
 )
     return true
@@ -91,7 +94,7 @@ end
 
 function MOI.set(
     model::Optimizer,
-    ::Reformulation,
+    ::ConstraintReformulation,
     ci::MOI.ConstraintIndex,
     value::AbstractComplementarityRelaxation,
 )
@@ -101,16 +104,16 @@ end
 
 function MOI.get(
     model::Optimizer,
-    ::Reformulation,
+    ::ConstraintReformulation,
     ci::MOI.ConstraintIndex,
 )
     return get(model.constraint_reformulations, ci, model.reformulation)
 end
 
-# Forward the Reformulation attribute through JuMP's LazyBridgeOptimizer
+# Forward the ConstraintReformulation attribute through JuMP's LazyBridgeOptimizer
 function MOI.supports(
     ::MOI.Bridges.LazyBridgeOptimizer{<:Optimizer},
-    ::Reformulation,
+    ::ConstraintReformulation,
     ::Type{<:MOI.ConstraintIndex{<:MOI.AbstractVectorFunction,<:MOI.Complements}},
 )
     return true
@@ -118,7 +121,7 @@ end
 
 function MOI.set(
     b::MOI.Bridges.LazyBridgeOptimizer{<:Optimizer},
-    attr::Reformulation,
+    attr::ConstraintReformulation,
     ci::MOI.ConstraintIndex,
     value::AbstractComplementarityRelaxation,
 )
@@ -127,7 +130,7 @@ end
 
 function MOI.get(
     b::MOI.Bridges.LazyBridgeOptimizer{<:Optimizer},
-    attr::Reformulation,
+    attr::ConstraintReformulation,
     ci::MOI.ConstraintIndex,
 )
     return MOI.get(b.model, attr, ci)
