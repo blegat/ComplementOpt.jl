@@ -5,7 +5,7 @@ Optimizer attribute that sets the default [`AbstractComplementarityRelaxation`](
 used to reformulate all complementarity constraints.
 
 This default is used for any constraint that does not have a constraint-specific
-reformulation set via [`ConstraintReformulation`](@ref).
+reformulation set via [`ComplementarityReformulation`](@ref).
 
 ## Example
 
@@ -16,7 +16,7 @@ MOI.set(model, ComplementOpt.Reformulation(), ComplementOpt.ScholtesRelaxation(0
 struct Reformulation <: MOI.AbstractOptimizerAttribute end
 
 """
-    ConstraintReformulation <: MOI.AbstractConstraintAttribute
+    ComplementarityReformulation <: MOI.AbstractConstraintAttribute
 
 Constraint attribute that overrides the [`AbstractComplementarityRelaxation`](@ref)
 for a specific complementarity constraint.
@@ -30,10 +30,10 @@ model-wide default.
 ```julia
 MOI.set(model, ComplementOpt.Reformulation(), ComplementOpt.ScholtesRelaxation(0.0))
 c = @constraint(model, x ⟂ y)
-MOI.set(model, ComplementOpt.ConstraintReformulation(), c, ComplementOpt.FischerBurmeisterRelaxation(1e-8))
+MOI.set(model, ComplementOpt.ComplementarityReformulation(), c, ComplementOpt.FischerBurmeisterRelaxation(1e-8))
 ```
 """
-struct ConstraintReformulation <: MOI.AbstractConstraintAttribute end
+struct ComplementarityReformulation <: MOI.AbstractConstraintAttribute end
 
 mutable struct Optimizer{O<:MOI.ModelLike} <: MOI.Bridges.AbstractBridgeOptimizer
     model::O # This need to be called `model` by convention of `AbstractBridgeOptimizer`
@@ -120,7 +120,7 @@ MOI.Utilities.map_indices(::Function, relax::AbstractComplementarityRelaxation) 
 # Per-constraint reformulation attribute
 function MOI.supports(
     ::Optimizer,
-    ::ConstraintReformulation,
+    ::ComplementarityReformulation,
     ::Type{<:MOI.ConstraintIndex{<:MOI.AbstractVectorFunction,<:MOI.Complements}},
 )
     return true
@@ -128,7 +128,7 @@ end
 
 function MOI.set(
     model::Optimizer,
-    ::ConstraintReformulation,
+    ::ComplementarityReformulation,
     ci::MOI.ConstraintIndex,
     value::AbstractComplementarityRelaxation,
 )
@@ -136,14 +136,14 @@ function MOI.set(
     return
 end
 
-function MOI.get(model::Optimizer, ::ConstraintReformulation, ci::MOI.ConstraintIndex)
+function MOI.get(model::Optimizer, ::ComplementarityReformulation, ci::MOI.ConstraintIndex)
     return get(model.constraint_reformulations, ci, model.reformulation)
 end
 
-# Forward the ConstraintReformulation attribute through JuMP's LazyBridgeOptimizer
+# Forward the ComplementarityReformulation attribute through JuMP's LazyBridgeOptimizer
 function MOI.supports(
     ::MOI.Bridges.LazyBridgeOptimizer{<:Optimizer},
-    ::ConstraintReformulation,
+    ::ComplementarityReformulation,
     ::Type{<:MOI.ConstraintIndex{<:MOI.AbstractVectorFunction,<:MOI.Complements}},
 )
     return true
@@ -151,7 +151,7 @@ end
 
 function MOI.set(
     b::MOI.Bridges.LazyBridgeOptimizer{<:Optimizer},
-    attr::ConstraintReformulation,
+    attr::ComplementarityReformulation,
     ci::MOI.ConstraintIndex,
     value::AbstractComplementarityRelaxation,
 )
@@ -160,7 +160,7 @@ end
 
 function MOI.get(
     b::MOI.Bridges.LazyBridgeOptimizer{<:Optimizer},
-    attr::ConstraintReformulation,
+    attr::ComplementarityReformulation,
     ci::MOI.ConstraintIndex,
 )
     return MOI.get(b.model, attr, ci)

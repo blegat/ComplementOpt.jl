@@ -330,17 +330,17 @@ end
     # Override c1 with FischerBurmeister
     MOI.set(
         model,
-        ComplementOpt.ConstraintReformulation(),
+        ComplementOpt.ComplementarityReformulation(),
         c1,
         ComplementOpt.FischerBurmeisterRelaxation(1e-8),
     )
     @test MOI.supports(JuMP.unsafe_backend(model), ComplementOpt.Reformulation())
     @test MOI.supports(
         JuMP.unsafe_backend(model),
-        ComplementOpt.ConstraintReformulation(),
+        ComplementOpt.ComplementarityReformulation(),
         MOI.ConstraintIndex{MOI.VectorOfVariables,MOI.Complements},
     )
-    @test MOI.get(model, ComplementOpt.ConstraintReformulation(), c1) isa
+    @test MOI.get(model, ComplementOpt.ComplementarityReformulation(), c1) isa
           ComplementOpt.FischerBurmeisterRelaxation
     JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
     JuMP.set_silent(model)
@@ -349,6 +349,6 @@ end
     # Test get fallback to default on the Optimizer directly
     opt = JuMP.unsafe_backend(model)
     dummy_ci = MOI.ConstraintIndex{MOI.VectorOfVariables,MOI.Complements}(0)
-    @test MOI.get(opt, ComplementOpt.ConstraintReformulation(), dummy_ci) isa
+    @test MOI.get(opt, ComplementOpt.ComplementarityReformulation(), dummy_ci) isa
           ComplementOpt.ScholtesRelaxation
 end
