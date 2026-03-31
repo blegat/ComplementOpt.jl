@@ -328,7 +328,12 @@ end
     # Default is Scholtes
     MOI.set(model, ComplementOpt.RelaxationMethod(), ComplementOpt.ScholtesRelaxation(0.0))
     # Override c1 with FischerBurmeister
-    MOI.set(model, ComplementOpt.ConstraintReformulation(), c1, ComplementOpt.FischerBurmeisterRelaxation(1e-8))
+    MOI.set(
+        model,
+        ComplementOpt.ConstraintReformulation(),
+        c1,
+        ComplementOpt.FischerBurmeisterRelaxation(1e-8),
+    )
     JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
     JuMP.set_silent(model)
     JuMP.optimize!(model)

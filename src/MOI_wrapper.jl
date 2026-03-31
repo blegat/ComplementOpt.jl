@@ -136,11 +136,7 @@ function MOI.set(
     return
 end
 
-function MOI.get(
-    model::Optimizer,
-    ::ConstraintReformulation,
-    ci::MOI.ConstraintIndex,
-)
+function MOI.get(model::Optimizer, ::ConstraintReformulation, ci::MOI.ConstraintIndex)
     return get(model.constraint_reformulations, ci, model.reformulation)
 end
 
@@ -199,7 +195,11 @@ function MOI.Bridges.add_bridged_constraint(b::Optimizer, BridgeType, f, s)
     return ci
 end
 
-function _rebridge!(model::Optimizer, bridge::NonlinearBridge, reformulation::AbstractComplementarityRelaxation)
+function _rebridge!(
+    model::Optimizer,
+    bridge::NonlinearBridge,
+    reformulation::AbstractComplementarityRelaxation,
+)
     # Delete old constraints from the inner model
     for ci in bridge.constraints
         MOI.delete(model.model, ci)
