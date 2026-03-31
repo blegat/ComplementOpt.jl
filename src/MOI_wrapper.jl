@@ -1,4 +1,38 @@
+"""
+    Reformulation <: MOI.AbstractOptimizerAttribute
+
+Optimizer attribute that sets the default [`AbstractComplementarityRelaxation`](@ref)
+used to reformulate all complementarity constraints.
+
+This default is used for any constraint that does not have a constraint-specific
+reformulation set via [`ConstraintReformulation`](@ref).
+
+## Example
+
+```julia
+MOI.set(model, ComplementOpt.Reformulation(), ComplementOpt.ScholtesRelaxation(0.0))
+```
+"""
 struct Reformulation <: MOI.AbstractOptimizerAttribute end
+
+"""
+    ConstraintReformulation <: MOI.AbstractConstraintAttribute
+
+Constraint attribute that overrides the [`AbstractComplementarityRelaxation`](@ref)
+for a specific complementarity constraint.
+
+When set, this takes precedence over the model-wide default set via
+[`Reformulation`](@ref). When not set, [`MOI.get`](@ref) returns the
+model-wide default.
+
+## Example
+
+```julia
+MOI.set(model, ComplementOpt.Reformulation(), ComplementOpt.ScholtesRelaxation(0.0))
+c = @constraint(model, x ⟂ y)
+MOI.set(model, ComplementOpt.ConstraintReformulation(), c, ComplementOpt.FischerBurmeisterRelaxation(1e-8))
+```
+"""
 struct ConstraintReformulation <: MOI.AbstractConstraintAttribute end
 
 mutable struct Optimizer{O<:MOI.ModelLike} <: MOI.Bridges.AbstractBridgeOptimizer
