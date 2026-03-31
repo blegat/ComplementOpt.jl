@@ -1,5 +1,5 @@
 """
-    Reformulation <: MOI.AbstractOptimizerAttribute
+    DefaultComplementarityReformulation <: MOI.AbstractOptimizerAttribute
 
 Optimizer attribute that sets the default [`AbstractComplementarityRelaxation`](@ref)
 used to reformulate all complementarity constraints.
@@ -10,10 +10,10 @@ reformulation set via [`ComplementarityReformulation`](@ref).
 ## Example
 
 ```julia
-MOI.set(model, ComplementOpt.Reformulation(), ComplementOpt.ScholtesRelaxation(0.0))
+MOI.set(model, ComplementOpt.DefaultComplementarityReformulation(), ComplementOpt.ScholtesRelaxation(0.0))
 ```
 """
-struct Reformulation <: MOI.AbstractOptimizerAttribute end
+struct DefaultComplementarityReformulation <: MOI.AbstractOptimizerAttribute end
 
 """
     ComplementarityReformulation <: MOI.AbstractConstraintAttribute
@@ -22,13 +22,13 @@ Constraint attribute that overrides the [`AbstractComplementarityRelaxation`](@r
 for a specific complementarity constraint.
 
 When set, this takes precedence over the model-wide default set via
-[`Reformulation`](@ref). When not set, [`MOI.get`](@ref) returns the
+[`DefaultComplementarityReformulation`](@ref). When not set, [`MOI.get`](@ref) returns the
 model-wide default.
 
 ## Example
 
 ```julia
-MOI.set(model, ComplementOpt.Reformulation(), ComplementOpt.ScholtesRelaxation(0.0))
+MOI.set(model, ComplementOpt.DefaultComplementarityReformulation(), ComplementOpt.ScholtesRelaxation(0.0))
 c = @constraint(model, x ⟂ y)
 MOI.set(model, ComplementOpt.ComplementarityReformulation(), c, ComplementOpt.FischerBurmeisterRelaxation(1e-8))
 ```
@@ -104,11 +104,11 @@ MOI.Bridges.recursive_model(b::Optimizer) = b
 struct RelaxationMethod <: MOI.AbstractOptimizerAttribute end
 
 MOI.supports(::Optimizer, ::RelaxationMethod) = true
-MOI.supports(::Optimizer, ::Reformulation) = true
+MOI.supports(::Optimizer, ::DefaultComplementarityReformulation) = true
 
 function MOI.set(
     model::Optimizer,
-    ::Union{RelaxationMethod,Reformulation},
+    ::Union{RelaxationMethod,DefaultComplementarityReformulation},
     reformulation::AbstractComplementarityRelaxation,
 )
     model.reformulation = reformulation

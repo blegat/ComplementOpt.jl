@@ -334,7 +334,7 @@ end
         c1,
         ComplementOpt.FischerBurmeisterRelaxation(1e-8),
     )
-    @test MOI.supports(JuMP.unsafe_backend(model), ComplementOpt.Reformulation())
+    @test MOI.supports(JuMP.unsafe_backend(model), ComplementOpt.DefaultComplementarityReformulation())
     @test MOI.supports(
         JuMP.unsafe_backend(model),
         ComplementOpt.ComplementarityReformulation(),
