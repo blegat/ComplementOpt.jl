@@ -1,5 +1,3 @@
-struct Reformulation <: MOI.AbstractOptimizerAttribute end
-
 mutable struct Optimizer{O<:MOI.ModelLike} <: MOI.Bridges.AbstractBridgeOptimizer
     model::O # This need to be called `model` by convention of `AbstractBridgeOptimizer`
     reformulation::AbstractComplementarityRelaxation
@@ -22,6 +20,13 @@ MOI.Bridges.Constraint.bridges(model::Optimizer) = model.constraint_map
 # No variable bridge
 MOI.Bridges.is_bridged(::Optimizer, ::Type{<:MOI.AbstractSet}) = false
 
+# But the variable bridged are still handled by this layer by creating variables
+# and then a constraint bridge
+MOI.Bridges.is_bridged(::Optimizer, ::Type{MOI.Complements}) = true
+MOI.Bridges.supports_bridging_constrained_variable(::Optimizer, ::Type{MOI.Complements}) =
+    true
+MOI.Bridges.bridge_type(::Optimizer, ::Type{MOI.Complements}) = NonlinearBridge
+
 # No objective bridge
 MOI.Bridges.is_bridged(::Optimizer, ::Type{<:MOI.AbstractFunction}) = false
 
@@ -34,26 +39,23 @@ MOI.Bridges.is_bridged(
 MOI.Bridges.is_bridged(
     ::Optimizer,
     ::Type{<:MOI.AbstractVectorFunction},
-    ::Type{<:MOI.Complements},
+    ::Type{MOI.Complements},
 ) = true
 MOI.Bridges.supports_bridging_constraint(
     ::Optimizer,
     ::Type{<:MOI.AbstractVectorFunction},
-    ::Type{<:MOI.Complements},
+    ::Type{MOI.Complements},
 ) = true
 MOI.Bridges.bridge_type(
     ::Optimizer,
     ::Type{<:MOI.AbstractVectorFunction},
-    ::Type{<:MOI.Complements},
+    ::Type{MOI.Complements},
 ) = VerticalBridge
 
-# It's a bit unfortunate that we're passing the reformulation as type parameter.
-# This means that if the user change the **value** of the tolerance in the reformulation
-# then it will trigger a recompilation of the bridge.
 MOI.Bridges.bridge_type(
-    model::Optimizer,
+    ::Optimizer,
     ::Type{<:MOI.VectorOfVariables},
-    ::Type{<:MOI.Complements},
+    ::Type{MOI.Complements},
 ) = NonlinearBridge
 
 function MOI.Bridges.bridging_cost(b::Optimizer, args...)
@@ -63,14 +65,11 @@ end
 # We may have a chain of bridges
 MOI.Bridges.recursive_model(b::Optimizer) = b
 
-# Relaxation attribute
-struct RelaxationMethod <: MOI.AbstractOptimizerAttribute end
-
-MOI.supports(::Optimizer, ::RelaxationMethod) = true
+MOI.supports(::Optimizer, ::DefaultComplementarityReformulation) = true
 
 function MOI.set(
     model::Optimizer,
-    ::RelaxationMethod,
+    ::DefaultComplementarityReformulation,
     reformulation::AbstractComplementarityRelaxation,
 )
     model.reformulation = reformulation

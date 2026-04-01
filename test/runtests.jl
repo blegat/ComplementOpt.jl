@@ -233,7 +233,7 @@ end
     @testset "Test reformulation" begin
         model = test_nonlinear_reformulation()
         set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
-        MOI.set(model, ComplementOpt.RelaxationMethod(), relax)
+        MOI.set(model, ComplementOpt.DefaultComplementarityReformulation(), relax)
         MOI.Utilities.attach_optimizer(model)
 
         for test_func in (
@@ -243,7 +243,7 @@ end
         )
             model = test_func()
             set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
-            MOI.set(model, ComplementOpt.RelaxationMethod(), relax)
+            MOI.set(model, ComplementOpt.DefaultComplementarityReformulation(), relax)
             @test_throws Exception MOI.Utilities.attach_optimizer(model)
         end
     end
@@ -251,7 +251,7 @@ end
     @testset "Solve Fletcher-Leyffer Ex1 problem" begin
         model = Instances.fletcher_leyffer_ex1_model()
         JuMP.set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
-        MOI.set(model, ComplementOpt.RelaxationMethod(), relax)
+        MOI.set(model, ComplementOpt.DefaultComplementarityReformulation(), relax)
         JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
         JuMP.set_silent(model)
         JuMP.optimize!(model)
@@ -264,7 +264,7 @@ end
     @testset "Solve NCP problem $(func)" for func in [simple_ncp, simple_lp_3]
         model, vars, sol = func()
         JuMP.set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
-        MOI.set(model, ComplementOpt.RelaxationMethod(), relax)
+        MOI.set(model, ComplementOpt.DefaultComplementarityReformulation(), relax)
         JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
         JuMP.set_silent(model)
         JuMP.optimize!(model)
@@ -288,7 +288,7 @@ end
                 MOI.instantiate(Ipopt.Optimizer, with_cache_type = Float64),
             ),
         )
-        MOI.set(model, ComplementOpt.RelaxationMethod(), relax)
+        MOI.set(model, ComplementOpt.DefaultComplementarityReformulation(), relax)
         JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
         JuMP.set_silent(model)
         JuMP.optimize!(model)
@@ -308,4 +308,105 @@ end
         @test JuMP.is_solved_and_feasible(model)
         @test JuMP.value.(vars) ≈ sol atol=1e-7
     end
+end
+
+@testset "Per-constraint reformulation" begin
+    model = Model()
+    @variable(model, x1)
+    @variable(model, 0.0 <= y1)
+    c1 = @constraint(model, x1 ⟂ y1)
+    @variable(model, x2)
+    @variable(model, 0.0 <= y2)
+    c2 = @constraint(model, x2 ⟂ y2)
+    @objective(model, Min, (x1 - 1)^2 + y1^2 + (x2 - 1)^2 + y2^2)
+    JuMP.set_optimizer(
+        model,
+        () -> ComplementOpt.Optimizer(
+            MOI.instantiate(Ipopt.Optimizer, with_cache_type = Float64),
+        ),
+        with_cache_type = Float64,
+    )
+    # Default is Scholtes
+    MOI.set(
+        model,
+        ComplementOpt.DefaultComplementarityReformulation(),
+        ComplementOpt.ScholtesRelaxation(0.0),
+    )
+    # Override c1 with FischerBurmeister
+    MOI.set(
+        model,
+        ComplementOpt.ComplementarityReformulation(),
+        c1,
+        ComplementOpt.FischerBurmeisterRelaxation(1e-8),
+    )
+    @test MOI.supports(
+        JuMP.unsafe_backend(model),
+        ComplementOpt.DefaultComplementarityReformulation(),
+    )
+    b = JuMP.unsafe_backend(model)
+    attr = ComplementOpt.ComplementarityReformulation()
+    F = MOI.VectorOfVariables
+    S = MOI.Complements
+    @test MOI.Bridges.is_bridged(b, S)
+    @test MOI.supports_add_constrained_variables(b, S)
+    @test !MOI.Bridges.is_variable_bridged(b, S)
+    bridge_type = MOI.Bridges.Constraint.concrete_bridge_type(b, F, S)
+    @test bridge_type == ComplementOpt.NonlinearBridge
+    @test MOI.supports(b, attr, bridge_type)
+    @test MOI.supports(
+        JuMP.unsafe_backend(model),
+        ComplementOpt.ComplementarityReformulation(),
+        MOI.ConstraintIndex{MOI.VectorOfVariables,MOI.Complements},
+    )
+    @test MOI.supports(
+        JuMP.unsafe_backend(model),
+        ComplementOpt.ComplementarityReformulation(),
+        MOI.ConstraintIndex{MOI.VectorOfVariables,MOI.Complements},
+    )
+    @test MOI.supports(
+        JuMP.unsafe_backend(model),
+        ComplementOpt.ComplementarityReformulation(),
+        MOI.ConstraintIndex{MOI.VectorOfVariables,MOI.Complements},
+    )
+    @test MOI.get(model, ComplementOpt.ComplementarityReformulation(), c1) isa
+          ComplementOpt.FischerBurmeisterRelaxation
+    JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
+    JuMP.set_silent(model)
+    JuMP.optimize!(model)
+    @test JuMP.is_solved_and_feasible(model)
+    # Test get through the LazyBridgeOptimizer
+    lazy = JuMP.backend(model).optimizer
+    @test !MOI.Bridges.is_bridged(lazy, S)
+    ci_mapped = first(
+        MOI.get(lazy, MOI.ListOfConstraintIndices{MOI.VectorOfVariables,MOI.Complements}()),
+    )
+    @test MOI.get(lazy, ComplementOpt.ComplementarityReformulation(), ci_mapped) isa
+          ComplementOpt.FischerBurmeisterRelaxation
+    @test MOI.get(model, ComplementOpt.ComplementarityReformulation(), c1) isa
+          ComplementOpt.FischerBurmeisterRelaxation
+    @test isnothing(MOI.get(model, ComplementOpt.ComplementarityReformulation(), c2))
+end
+
+@testset "Per-constraint reformulation with VerticalBridge" begin
+    # Use an expression LHS so that the constraint goes through VerticalBridge
+    model = Model()
+    @variable(model, x >= 0.0)
+    @variable(model, y >= 0.0)
+    c = @constraint(model, [x + y, y] ∈ MOI.Complements(2))
+    @objective(model, Min, x^2 + y^2)
+    JuMP.set_optimizer(
+        model,
+        () -> ComplementOpt.Optimizer(
+            MOI.instantiate(Ipopt.Optimizer, with_cache_type = Float64),
+        ),
+    )
+    attr = ComplementOpt.ComplementarityReformulation()
+    reformulation = ComplementOpt.FischerBurmeisterRelaxation(1e-8)
+    MOI.set(model, attr, c, reformulation)
+    JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
+    JuMP.set_silent(model)
+    JuMP.optimize!(model)
+    @test MOI.supports(backend(model), attr, typeof(index(c)))
+    @test MOI.get(model, attr, c) == reformulation
+    @test JuMP.is_solved_and_feasible(model)
 end

@@ -1,14 +1,8 @@
-
-"""
-    AbstractComplementarityRelaxation
-
-Abstract type to implement any complementarity function ``\\psi``.
-
-"""
-abstract type AbstractComplementarityRelaxation end
-
-struct NonlinearBridge <: MOI.Bridges.Constraint.AbstractBridge
+mutable struct NonlinearBridge <: MOI.Bridges.Constraint.AbstractBridge
     constraints::Vector
+    func::MOI.VectorOfVariables
+    set::MOI.Complements
+    reformulation::AbstractComplementarityRelaxation
 end
 
 function MOI.Bridges.Constraint.bridge_constraint(
@@ -21,9 +15,40 @@ function MOI.Bridges.Constraint.bridge_constraint(
     # `MOI.Bridges.LazyBridgeOptimizer`
     reformulation::AbstractComplementarityRelaxation = ScholtesRelaxation(0.0),
 )
-    return NonlinearBridge(
-        reformulate_as_nonlinear_program!(model, reformulation, func, set),
+    # Delay reformulation until `final_touch` so that per-constraint
+    # `ComplementarityReformulation` attributes can override it first.
+    return NonlinearBridge([], func, set, reformulation)
+end
+
+MOI.supports(::MOI.ModelLike, ::ComplementarityReformulation, ::Type{<:NonlinearBridge}) =
+    true
+
+function MOI.set(
+    ::MOI.ModelLike,
+    ::ComplementarityReformulation,
+    bridge::NonlinearBridge,
+    value::AbstractComplementarityRelaxation,
+)
+    bridge.reformulation = value
+    return
+end
+
+MOI.Bridges.needs_final_touch(::NonlinearBridge) = true
+
+function MOI.Bridges.final_touch(bridge::NonlinearBridge, model::MOI.ModelLike)
+    if !isempty(bridge.constraints)
+        return
+    end
+    append!(
+        bridge.constraints,
+        reformulate_as_nonlinear_program!(
+            model,
+            bridge.reformulation,
+            bridge.func,
+            bridge.set,
+        ),
     )
+    return
 end
 
 """
