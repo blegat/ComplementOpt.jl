@@ -140,32 +140,6 @@ function MOI.get(model::Optimizer, ::ComplementarityReformulation, ci::MOI.Const
     return get(model.constraint_reformulations, ci, model.reformulation)
 end
 
-# Forward the ComplementarityReformulation attribute through JuMP's LazyBridgeOptimizer
-function MOI.supports(
-    ::MOI.Bridges.LazyBridgeOptimizer{<:Optimizer},
-    ::ComplementarityReformulation,
-    ::Type{<:MOI.ConstraintIndex{<:MOI.AbstractVectorFunction,<:MOI.Complements}},
-)
-    return true
-end
-
-function MOI.set(
-    b::MOI.Bridges.LazyBridgeOptimizer{<:Optimizer},
-    attr::ComplementarityReformulation,
-    ci::MOI.ConstraintIndex,
-    value::AbstractComplementarityRelaxation,
-)
-    return MOI.set(b.model, attr, ci, value)
-end
-
-function MOI.get(
-    b::MOI.Bridges.LazyBridgeOptimizer{<:Optimizer},
-    attr::ComplementarityReformulation,
-    ci::MOI.ConstraintIndex,
-)
-    return MOI.get(b.model, attr, ci)
-end
-
 _additional_arguments(::Optimizer, ::Type) = tuple()
 
 function _additional_arguments(model::Optimizer, ::Type{NonlinearBridge})
