@@ -349,11 +349,6 @@ end
     JuMP.set_silent(model)
     JuMP.optimize!(model)
     @test JuMP.is_solved_and_feasible(model)
-    # Test get fallback to default on the Optimizer directly
-    opt = JuMP.unsafe_backend(model)
-    dummy_ci = MOI.ConstraintIndex{MOI.VectorOfVariables,MOI.Complements}(0)
-    @test MOI.get(opt, ComplementOpt.ComplementarityReformulation(), dummy_ci) isa
-          ComplementOpt.ScholtesRelaxation
     # Test get through the LazyBridgeOptimizer
     lazy = JuMP.backend(model).optimizer
     ci_mapped = first(

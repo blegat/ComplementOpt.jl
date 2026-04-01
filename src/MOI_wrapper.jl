@@ -38,7 +38,6 @@ struct ComplementarityReformulation <: MOI.AbstractConstraintAttribute end
 mutable struct Optimizer{O<:MOI.ModelLike} <: MOI.Bridges.AbstractBridgeOptimizer
     model::O # This need to be called `model` by convention of `AbstractBridgeOptimizer`
     reformulation::AbstractComplementarityRelaxation
-    constraint_reformulations::Dict{MOI.ConstraintIndex,AbstractComplementarityRelaxation}
     constraint_map::MOI.Bridges.Constraint.Map
     con_to_name::Dict{MOI.ConstraintIndex,String}
     name_to_con::Union{Dict{String,MOI.ConstraintIndex},Nothing}
@@ -46,7 +45,6 @@ mutable struct Optimizer{O<:MOI.ModelLike} <: MOI.Bridges.AbstractBridgeOptimize
         return new{typeof(model)}(
             model,
             ScholtesRelaxation(0.0),
-            Dict{MOI.ConstraintIndex,AbstractComplementarityRelaxation}(),
             MOI.Bridges.Constraint.Map(),
             Dict{MOI.ConstraintIndex,String}(),
             nothing,
@@ -117,27 +115,109 @@ end
 
 MOI.Utilities.map_indices(::Function, relax::AbstractComplementarityRelaxation) = relax
 
-# Per-constraint reformulation attribute
+# Per-constraint reformulation attribute: supported on bridges
+
+# # The generic `MOI.supports` for `AbstractBridgeOptimizer` tries to resolve the
+# # bridge type via the bridge graph, which crashes for `LazyBridgeOptimizer` when
+# # the bridge is only registered in the inner `Optimizer`. We bypass this by
+# # forwarding directly to the inner model.
+function MOI.supports(
+    b::MOI.Bridges.AbstractBridgeOptimizer,
+    ::ComplementarityReformulation,
+    ::Type{<:MOI.ConstraintIndex{<:MOI.AbstractVectorFunction,MOI.Complements}},
+)
+    return MOI.supports(
+        b.model,
+        ComplementarityReformulation(),
+        MOI.ConstraintIndex{MOI.VectorOfVariables,MOI.Complements},
+    )
+end
+
+# The Optimizer knows it supports this attribute (its bridges handle it).
 function MOI.supports(
     ::Optimizer,
     ::ComplementarityReformulation,
-    ::Type{<:MOI.ConstraintIndex{<:MOI.AbstractVectorFunction,<:MOI.Complements}},
+    ::Type{<:MOI.ConstraintIndex{<:MOI.AbstractVectorFunction,MOI.Complements}},
+)
+    return true
+end
+
+function MOI.supports(
+    ::MOI.ModelLike,
+    ::ComplementarityReformulation,
+    ::Type{NonlinearBridge},
 )
     return true
 end
 
 function MOI.set(
-    model::Optimizer,
+    ::MOI.ModelLike,
+    ::ComplementarityReformulation,
+    bridge::NonlinearBridge,
+    value::AbstractComplementarityRelaxation,
+)
+    bridge.reformulation = value
+    return
+end
+
+function MOI.get(::MOI.ModelLike, ::ComplementarityReformulation, bridge::NonlinearBridge)
+    return bridge.reformulation
+end
+
+function MOI.supports(
+    ::MOI.ModelLike,
+    ::ComplementarityReformulation,
+    ::Type{VerticalBridge},
+)
+    return true
+end
+
+# Override `MOI.set`/`MOI.get` on `AbstractBridgeOptimizer` to bypass the
+# standard bridge dispatching, which fails for `VectorOfVariables` constraints
+# with negative CI values. We forward directly to the inner model.
+function MOI.set(
+    b::MOI.Bridges.AbstractBridgeOptimizer,
+    attr::ComplementarityReformulation,
+    ci::MOI.ConstraintIndex,
+    value::AbstractComplementarityRelaxation,
+)
+    MOI.set(b.model, attr, ci, value)
+    return
+end
+
+function MOI.get(
+    b::MOI.Bridges.AbstractBridgeOptimizer,
+    attr::ComplementarityReformulation,
+    ci::MOI.ConstraintIndex,
+)
+    return MOI.get(b.model, attr, ci)
+end
+
+# On the Optimizer, dispatch to the bridge directly.
+function MOI.set(
+    b::Optimizer,
     ::ComplementarityReformulation,
     ci::MOI.ConstraintIndex,
     value::AbstractComplementarityRelaxation,
 )
-    model.constraint_reformulations[ci] = value
+    bridge = MOI.Bridges.bridge(b, ci)
+    if bridge isa VerticalBridge
+        inner_bridge = MOI.Bridges.bridge(b, bridge.constraint)
+        inner_bridge.reformulation = value
+    else
+        bridge.reformulation = value
+    end
     return
 end
 
-function MOI.get(model::Optimizer, ::ComplementarityReformulation, ci::MOI.ConstraintIndex)
-    return get(model.constraint_reformulations, ci, model.reformulation)
+function MOI.get(b::Optimizer, ::ComplementarityReformulation, ci::MOI.ConstraintIndex)
+    bridge = MOI.Bridges.bridge(b, ci)
+    if bridge isa VerticalBridge
+        inner_bridge = MOI.Bridges.bridge(b, bridge.constraint)
+        return inner_bridge.reformulation
+    else
+        return bridge.reformulation
+    end
 end
 
 _additional_arguments(::Optimizer, ::Type) = tuple()
@@ -167,41 +247,4 @@ function MOI.Bridges.add_bridged_constraint(b::Optimizer, BridgeType, f, s)
     )
     MOI.Bridges.Variable.register_context(MOI.Bridges.Variable.bridges(b), ci)
     return ci
-end
-
-function _rebridge!(
-    model::Optimizer,
-    bridge::NonlinearBridge,
-    reformulation::AbstractComplementarityRelaxation,
-)
-    # Delete old constraints from the inner model
-    for ci in bridge.constraints
-        MOI.delete(model.model, ci)
-    end
-    # Re-create with the new reformulation
-    new_constraints = reformulate_as_nonlinear_program!(
-        model.model,
-        reformulation,
-        bridge.func,
-        bridge.set,
-    )
-    empty!(bridge.constraints)
-    append!(bridge.constraints, new_constraints)
-    return
-end
-
-function _get_nonlinear_bridge(model::Optimizer, ci::MOI.ConstraintIndex)
-    bridge = MOI.Bridges.bridge(model, ci)
-    if bridge isa VerticalBridge
-        return MOI.Bridges.bridge(model, bridge.constraint)
-    end
-    return bridge
-end
-
-function MOI.optimize!(model::Optimizer)
-    for (ci, relax) in model.constraint_reformulations
-        bridge = _get_nonlinear_bridge(model, ci)
-        _rebridge!(model, bridge, relax)
-    end
-    return MOI.optimize!(model.model)
 end
