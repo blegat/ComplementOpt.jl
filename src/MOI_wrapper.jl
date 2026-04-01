@@ -60,7 +60,8 @@ MOI.Bridges.is_bridged(::Optimizer, ::Type{<:MOI.AbstractSet}) = false
 # But the variable bridged are still handled by this layer by creating variables
 # and then a constraint bridge
 MOI.Bridges.is_bridged(::Optimizer, ::Type{MOI.Complements}) = true
-MOI.Bridges.supports_bridging_constrained_variable(::Optimizer, ::Type{MOI.Complements}) = true
+MOI.Bridges.supports_bridging_constrained_variable(::Optimizer, ::Type{MOI.Complements}) =
+    true
 MOI.Bridges.bridge_type(::Optimizer, ::Type{MOI.Complements}) = NonlinearBridge
 
 # No objective bridge

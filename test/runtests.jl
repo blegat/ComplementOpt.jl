@@ -327,7 +327,11 @@ end
         with_cache_type = Float64,
     )
     # Default is Scholtes
-    MOI.set(model, ComplementOpt.DefaultComplementarityReformulation(), ComplementOpt.ScholtesRelaxation(0.0))
+    MOI.set(
+        model,
+        ComplementOpt.DefaultComplementarityReformulation(),
+        ComplementOpt.ScholtesRelaxation(0.0),
+    )
     # Override c1 with FischerBurmeister
     MOI.set(
         model,

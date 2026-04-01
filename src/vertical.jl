@@ -12,9 +12,15 @@ function MOI.Bridges.Constraint.bridge_constraint(
     return VerticalBridge(reformulate_to_vertical!(model, func, set)...)
 end
 
-MOI.supports(::MOI.ModelLike, ::ComplementarityReformulation, ::Type{<:VerticalBridge}) = true
+MOI.supports(::MOI.ModelLike, ::ComplementarityReformulation, ::Type{<:VerticalBridge}) =
+    true
 
-function MOI.set(model::MOI.ModelLike, attr::ComplementarityReformulation, bridge::VerticalBridge, value::AbstractComplementarityRelaxation)
+function MOI.set(
+    model::MOI.ModelLike,
+    attr::ComplementarityReformulation,
+    bridge::VerticalBridge,
+    value::AbstractComplementarityRelaxation,
+)
     MOI.set(model, attr, bridge.constraint, value)
     return
 end
