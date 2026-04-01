@@ -357,10 +357,7 @@ end
     # Test get through the LazyBridgeOptimizer
     lazy = JuMP.backend(model).optimizer
     ci_mapped = first(
-        MOI.get(
-            lazy,
-            MOI.ListOfConstraintIndices{MOI.VectorOfVariables,MOI.Complements}(),
-        ),
+        MOI.get(lazy, MOI.ListOfConstraintIndices{MOI.VectorOfVariables,MOI.Complements}()),
     )
     @test MOI.get(lazy, ComplementOpt.ComplementarityReformulation(), ci_mapped) isa
           ComplementOpt.FischerBurmeisterRelaxation
