@@ -1,12 +1,3 @@
-
-"""
-    AbstractComplementarityRelaxation
-
-Abstract type to implement any complementarity function ``\\psi``.
-
-"""
-abstract type AbstractComplementarityRelaxation end
-
 mutable struct NonlinearBridge <: MOI.Bridges.Constraint.AbstractBridge
     constraints::Vector
     func::MOI.VectorOfVariables

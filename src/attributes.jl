@@ -1,4 +1,12 @@
 """
+    AbstractComplementarityRelaxation
+
+Abstract type to implement any complementarity function ``\\psi``.
+
+"""
+abstract type AbstractComplementarityRelaxation end
+
+"""
     DefaultComplementarityReformulation <: MOI.AbstractOptimizerAttribute
 
 Optimizer attribute that sets the default [`AbstractComplementarityRelaxation`](@ref)
