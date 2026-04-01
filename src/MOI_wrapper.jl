@@ -57,6 +57,12 @@ MOI.Bridges.Constraint.bridges(model::Optimizer) = model.constraint_map
 # No variable bridge
 MOI.Bridges.is_bridged(::Optimizer, ::Type{<:MOI.AbstractSet}) = false
 
+# But the variable bridged are still handled by this layer by creating variables
+# and then a constraint bridge
+MOI.Bridges.is_bridged(::Optimizer, ::Type{MOI.Complements}) = true
+MOI.Bridges.supports_bridging_constrained_variable(::Optimizer, ::Type{MOI.Complements}) = true
+MOI.Bridges.bridge_type(::Optimizer, ::Type{MOI.Complements}) = NonlinearBridge
+
 # No objective bridge
 MOI.Bridges.is_bridged(::Optimizer, ::Type{<:MOI.AbstractFunction}) = false
 
@@ -69,26 +75,23 @@ MOI.Bridges.is_bridged(
 MOI.Bridges.is_bridged(
     ::Optimizer,
     ::Type{<:MOI.AbstractVectorFunction},
-    ::Type{<:MOI.Complements},
+    ::Type{MOI.Complements},
 ) = true
 MOI.Bridges.supports_bridging_constraint(
     ::Optimizer,
     ::Type{<:MOI.AbstractVectorFunction},
-    ::Type{<:MOI.Complements},
+    ::Type{MOI.Complements},
 ) = true
 MOI.Bridges.bridge_type(
     ::Optimizer,
     ::Type{<:MOI.AbstractVectorFunction},
-    ::Type{<:MOI.Complements},
+    ::Type{MOI.Complements},
 ) = VerticalBridge
 
-# It's a bit unfortunate that we're passing the reformulation as type parameter.
-# This means that if the user change the **value** of the tolerance in the reformulation
-# then it will trigger a recompilation of the bridge.
 MOI.Bridges.bridge_type(
-    model::Optimizer,
+    ::Optimizer,
     ::Type{<:MOI.VectorOfVariables},
-    ::Type{<:MOI.Complements},
+    ::Type{MOI.Complements},
 ) = NonlinearBridge
 
 function MOI.Bridges.bridging_cost(b::Optimizer, args...)
@@ -98,15 +101,11 @@ end
 # We may have a chain of bridges
 MOI.Bridges.recursive_model(b::Optimizer) = b
 
-# Model-wide default reformulation attribute
-struct RelaxationMethod <: MOI.AbstractOptimizerAttribute end
-
-MOI.supports(::Optimizer, ::RelaxationMethod) = true
 MOI.supports(::Optimizer, ::DefaultComplementarityReformulation) = true
 
 function MOI.set(
     model::Optimizer,
-    ::Union{RelaxationMethod,DefaultComplementarityReformulation},
+    ::DefaultComplementarityReformulation,
     reformulation::AbstractComplementarityRelaxation,
 )
     model.reformulation = reformulation
@@ -114,111 +113,6 @@ function MOI.set(
 end
 
 MOI.Utilities.map_indices(::Function, relax::AbstractComplementarityRelaxation) = relax
-
-# Per-constraint reformulation attribute: supported on bridges
-
-# # The generic `MOI.supports` for `AbstractBridgeOptimizer` tries to resolve the
-# # bridge type via the bridge graph, which crashes for `LazyBridgeOptimizer` when
-# # the bridge is only registered in the inner `Optimizer`. We bypass this by
-# # forwarding directly to the inner model.
-function MOI.supports(
-    b::MOI.Bridges.AbstractBridgeOptimizer,
-    ::ComplementarityReformulation,
-    ::Type{<:MOI.ConstraintIndex{<:MOI.AbstractVectorFunction,MOI.Complements}},
-)
-    return MOI.supports(
-        b.model,
-        ComplementarityReformulation(),
-        MOI.ConstraintIndex{MOI.VectorOfVariables,MOI.Complements},
-    )
-end
-
-# The Optimizer knows it supports this attribute (its bridges handle it).
-function MOI.supports(
-    ::Optimizer,
-    ::ComplementarityReformulation,
-    ::Type{<:MOI.ConstraintIndex{<:MOI.AbstractVectorFunction,MOI.Complements}},
-)
-    return true
-end
-
-function MOI.supports(
-    ::MOI.ModelLike,
-    ::ComplementarityReformulation,
-    ::Type{NonlinearBridge},
-)
-    return true
-end
-
-function MOI.set(
-    ::MOI.ModelLike,
-    ::ComplementarityReformulation,
-    bridge::NonlinearBridge,
-    value::AbstractComplementarityRelaxation,
-)
-    bridge.reformulation = value
-    return
-end
-
-function MOI.get(::MOI.ModelLike, ::ComplementarityReformulation, bridge::NonlinearBridge)
-    return bridge.reformulation
-end
-
-function MOI.supports(
-    ::MOI.ModelLike,
-    ::ComplementarityReformulation,
-    ::Type{VerticalBridge},
-)
-    return true
-end
-
-# Override `MOI.set`/`MOI.get` on `AbstractBridgeOptimizer` to bypass the
-# standard bridge dispatching, which fails for `VectorOfVariables` constraints
-# with negative CI values. We forward directly to the inner model.
-function MOI.set(
-    b::MOI.Bridges.AbstractBridgeOptimizer,
-    attr::ComplementarityReformulation,
-    ci::MOI.ConstraintIndex,
-    value::AbstractComplementarityRelaxation,
-)
-    MOI.set(b.model, attr, ci, value)
-    return
-end
-
-function MOI.get(
-    b::MOI.Bridges.AbstractBridgeOptimizer,
-    attr::ComplementarityReformulation,
-    ci::MOI.ConstraintIndex,
-)
-    return MOI.get(b.model, attr, ci)
-end
-
-# On the Optimizer, dispatch to the bridge directly.
-function MOI.set(
-    b::Optimizer,
-    ::ComplementarityReformulation,
-    ci::MOI.ConstraintIndex,
-    value::AbstractComplementarityRelaxation,
-)
-    bridge = MOI.Bridges.bridge(b, ci)
-    if bridge isa VerticalBridge
-        inner_bridge = MOI.Bridges.bridge(b, bridge.constraint)
-        inner_bridge.reformulation = value
-    else
-        bridge.reformulation = value
-    end
-    return
-end
-
-function MOI.get(b::Optimizer, ::ComplementarityReformulation, ci::MOI.ConstraintIndex)
-    bridge = MOI.Bridges.bridge(b, ci)
-    if bridge isa VerticalBridge
-        inner_bridge = MOI.Bridges.bridge(b, bridge.constraint)
-        return inner_bridge.reformulation
-    else
-        return bridge.reformulation
-    end
-end
 
 _additional_arguments(::Optimizer, ::Type) = tuple()
 

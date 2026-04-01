@@ -41,9 +41,9 @@ JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
 
 ## Supported reformulations
 
-You can change the reformulation by using the optimizer attribute `ComplementOpt.RelaxationMethod`:
+You can change the reformulation by using the optimizer attribute `ComplementOpt.DefaultComplementarityReformulation`:
 ```julia
-MOI.set(model, ComplementOpt.RelaxationMethod(), ComplementOpt.ScholtesRelaxation(0.0))
+MOI.set(model, ComplementOpt.DefaultComplementarityReformulation(), ComplementOpt.ScholtesRelaxation(0.0))
 ```
 
 ComplementOpt supports the following reformulations:

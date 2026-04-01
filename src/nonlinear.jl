@@ -29,6 +29,13 @@ function MOI.Bridges.Constraint.bridge_constraint(
     return NonlinearBridge([], func, set, reformulation)
 end
 
+MOI.supports(::MOI.ModelLike, ::ComplementarityReformulation, ::Type{<:NonlinearBridge}) = true
+
+function MOI.set(::MOI.ModelLike, ::ComplementarityReformulation, bridge::NonlinearBridge, value::AbstractComplementarityRelaxation)
+    bridge.reformulation = value
+    return
+end
+
 MOI.Bridges.needs_final_touch(::NonlinearBridge) = true
 
 function MOI.Bridges.final_touch(bridge::NonlinearBridge, model::MOI.ModelLike)
