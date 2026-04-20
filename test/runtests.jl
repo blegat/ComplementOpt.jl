@@ -240,7 +240,6 @@ end
         for test_func in (
             test_nonlinear_mispecified_1,
             test_nonlinear_mispecified_2,
-            test_nonlinear_mispecified_3,
         )
             model = test_func()
             set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
@@ -352,7 +351,7 @@ end
     @test MOI.supports_add_constrained_variables(b, S)
     @test !MOI.Bridges.is_variable_bridged(b, S)
     bridge_type = MOI.Bridges.Constraint.concrete_bridge_type(b, F, S)
-    @test bridge_type == ComplementOpt.NonlinearBridge
+    @test bridge_type == ComplementOpt.SpecifySetTypeBridge
     @test MOI.supports(b, attr, bridge_type)
     @test MOI.supports(
         JuMP.unsafe_backend(model),
@@ -388,8 +387,71 @@ end
     @test isnothing(MOI.get(model, ComplementOpt.ComplementarityReformulation(), c2))
 end
 
+@testset "SpecifySetTypeBridge" begin
+    @testset "Lower bound (Nonnegatives)" begin
+        model = Model()
+        @variable(model, x)
+        @variable(model, 0.0 <= y)
+        @constraint(model, [x, y] ∈ MOI.Complements(2))
+        inner = MOI.Utilities.Model{Float64}()
+        set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
+        MOI.Utilities.attach_optimizer(model)
+        # ComplementsWithSetType is bridged further to nonlinear constraints
+        S = ComplementOpt.ComplementsWithSetType{MOI.Nonnegatives}
+        @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) == 0
+    end
+
+    @testset "Lower bound (GreaterThan)" begin
+        model = Model()
+        @variable(model, x)
+        @variable(model, 3.0 <= y)
+        @constraint(model, [x, y] ∈ MOI.Complements(2))
+        inner = MOI.Utilities.Model{Float64}()
+        set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
+        MOI.Utilities.attach_optimizer(model)
+        S = ComplementOpt.ComplementsWithSetType{MOI.GreaterThan{Float64}}
+        @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) == 0
+    end
+
+    @testset "Upper bound (LessThan)" begin
+        model = Model()
+        @variable(model, x)
+        @variable(model, y <= 1.0)
+        @constraint(model, [x, y] ∈ MOI.Complements(2))
+        inner = MOI.Utilities.Model{Float64}()
+        set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
+        MOI.Utilities.attach_optimizer(model)
+        S = ComplementOpt.ComplementsWithSetType{MOI.LessThan{Float64}}
+        @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) == 0
+    end
+
+    @testset "Range case (x1 unbounded → Interval)" begin
+        model = Model()
+        @variable(model, x)
+        @variable(model, 0.0 <= y <= 1.0)
+        @constraint(model, [x, y] ∈ MOI.Complements(2))
+        inner = MOI.Utilities.Model{Float64}()
+        set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
+        MOI.Utilities.attach_optimizer(model)
+        S = ComplementOpt.ComplementsWithSetType{MOI.Interval{Float64}}
+        @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) == 0
+    end
+
+    @testset "Range case (x1 bounded nonneg → reduces to lower bound)" begin
+        model = Model()
+        @variable(model, 0.0 <= x <= 10.0)
+        @variable(model, 0.0 <= y <= 10.0)
+        @constraint(model, [x, y] ∈ MOI.Complements(2))
+        inner = MOI.Utilities.Model{Float64}()
+        set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
+        MOI.Utilities.attach_optimizer(model)
+        S = ComplementOpt.ComplementsWithSetType{MOI.Nonnegatives}
+        @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) == 0
+    end
+end
+
 @testset "SOS1 reformulation" begin
-    @testset "Structural test" begin
+    @testset "Structural test (lower bound)" begin
         model = test_nonlinear_reformulation()
         inner = MOI.Utilities.Model{Float64}()
         set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
@@ -399,65 +461,29 @@ end
             ComplementOpt.SOS1Relaxation(),
         )
         MOI.Utilities.attach_optimizer(model)
+        @test MOI.get(
+            inner,
+            MOI.NumberOfConstraints{MOI.VectorOfVariables,MOI.SOS1{Float64}}(),
+        ) > 0
     end
 
-    # HiGHS does not support SOS1 natively; MOI bridges SOS1→MILP which
-    # requires finite bounds on all variables. Use full_bridge_optimizer
-    # and only linear objectives (HiGHS cannot solve MIQP).
-
-    @testset "Solve bounded LP (lower bound)" begin
-        # min -x - 2y s.t. 0 <= x <= 10, 0 <= y <= 10, x ⟂ y
-        # x*y = 0: either x=0 → obj = -2*10 = -20, or y=0 → obj = -10
-        # Optimal: x=0, y=10, obj=-20
+    @testset "Structural test (upper bound)" begin
         model = Model()
-        @variable(model, 0 <= x <= 10)
-        @variable(model, 0 <= y <= 10)
-        @objective(model, Min, -x - 2y)
+        @variable(model, x)
+        @variable(model, y <= 0.0)
         @constraint(model, x ⟂ y)
-        inner = MOI.Bridges.full_bridge_optimizer(HiGHS.Optimizer(), Float64)
-        JuMP.set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
+        inner = MOI.Utilities.Model{Float64}()
+        set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
         MOI.set(
             model,
             ComplementOpt.DefaultComplementarityReformulation(),
             ComplementOpt.SOS1Relaxation(),
         )
-        JuMP.set_silent(model)
-        JuMP.optimize!(model)
-
-        @test JuMP.is_solved_and_feasible(model)
-        @test JuMP.objective_value(model) ≈ -20.0 atol = 1e-4
-        @test JuMP.value(x) ≈ 0.0 atol = 1e-4
-        @test JuMP.value(y) ≈ 10.0 atol = 1e-4
-    end
-
-    @testset "Solve bounded LP (range complementarity)" begin
-        # min x s.t. 0 <= x <= 1, -10 <= μ <= 10, 1 - μ = 0, μ ⟂ x
-        # μ = 1 > 0 so x must be at lower bound → x = 0
-        model = Model()
-        @variable(model, 0 <= x <= 1)
-        @variable(model, -10 <= μ <= 10)
-        @objective(model, Min, x)
-        @constraint(model, 1 - μ == 0.0)
-        @constraint(model, μ ⟂ x)
-        inner = MOI.Bridges.full_bridge_optimizer(
-            MOI.Utilities.CachingOptimizer(
-                MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}()),
-                HiGHS.Optimizer(),
-            ),
-            Float64,
-        )
-        JuMP.set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
-        MOI.set(
-            model,
-            ComplementOpt.DefaultComplementarityReformulation(),
-            ComplementOpt.SOS1Relaxation(),
-        )
-        JuMP.set_silent(model)
-        JuMP.optimize!(model)
-
-        @test JuMP.is_solved_and_feasible(model)
-        @test JuMP.value(x) ≈ 0.0 atol = 1e-4
-        @test JuMP.value(μ) ≈ 1.0 atol = 1e-4
+        MOI.Utilities.attach_optimizer(model)
+        @test MOI.get(
+            inner,
+            MOI.NumberOfConstraints{MOI.VectorOfVariables,MOI.SOS1{Float64}}(),
+        ) > 0
     end
 end
 

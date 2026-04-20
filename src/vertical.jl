@@ -1,15 +1,26 @@
-struct VerticalBridge <: MOI.Bridges.Constraint.AbstractBridge
-    constraint::MOI.ConstraintIndex{MOI.VectorOfVariables,MOI.Complements}
+struct VerticalBridge{S<:MOI.AbstractVectorSet} <: MOI.Bridges.Constraint.AbstractBridge
+    constraint::MOI.ConstraintIndex{MOI.VectorOfVariables,S}
     equalities::Vector{MOI.ConstraintIndex}
 end
 
 function MOI.Bridges.Constraint.bridge_constraint(
-    ::Type{VerticalBridge},
+    ::Type{VerticalBridge{MOI.Complements}},
     model::MOI.ModelLike,
     func::MOI.AbstractVectorFunction,
     set::MOI.Complements,
 )
-    return VerticalBridge(reformulate_to_vertical!(model, func, set)...)
+    return VerticalBridge{MOI.Complements}(reformulate_to_vertical!(model, func, set)...)
+end
+
+function MOI.Bridges.Constraint.bridge_constraint(
+    ::Type{VerticalBridge{ComplementsWithSetType{S}}},
+    model::MOI.ModelLike,
+    func::MOI.AbstractVectorFunction,
+    set::ComplementsWithSetType{S},
+) where {S}
+    return VerticalBridge{ComplementsWithSetType{S}}(
+        reformulate_to_vertical!(model, func, set)...,
+    )
 end
 
 MOI.supports(::MOI.ModelLike, ::ComplementarityReformulation, ::Type{<:VerticalBridge}) =
@@ -107,12 +118,16 @@ function reformulate_to_vertical!(model::MOI.ModelLike, fun, set)
     # Read each complementarity constraint and get corresponding indices
     cc_lhs, cc_rhs = _parse_complementarity_constraint(fun, n_comp)
     for (lhs, x2) in zip(cc_lhs, cc_rhs)
-        # Check if x2 is bounded.
-        lb, ub = MOIU.get_bounds(model, Float64, x2)
-        if isinf(lb) && isinf(ub)
-            # If x2 is unbounded, the LHS is directly converted to an equality constraint.
-            push!(equalities, MOI.add_constraint(model, lhs, MOI.EqualTo{Float64}(0)))
-        elseif isa(lhs, MOI.VariableIndex)
+        if set isa MOI.Complements
+            # Check if x2 is bounded.
+            lb, ub = MOIU.get_bounds(model, Float64, x2)
+            if isinf(lb) && isinf(ub)
+                # If x2 is unbounded, the LHS is directly converted to an equality constraint.
+                push!(equalities, MOI.add_constraint(model, lhs, MOI.EqualTo{Float64}(0)))
+                continue
+            end
+        end
+        if isa(lhs, MOI.VariableIndex)
             # If lhs is a variable, no need to reformulate the
             # complementarity constraint using a slack.
             # TODO: we should check if the variable lhs is bounded.
@@ -129,6 +144,11 @@ function reformulate_to_vertical!(model::MOI.ModelLike, fun, set)
     end
     n_cc = length(ind_cc1)
     comp = MOI.VectorOfVariables([ind_cc1; ind_cc2])
-    ci = MOI.add_constraint(model, comp, MOI.Complements(2*n_cc))
+    S = typeof(set)
+    if set isa MOI.Complements
+        ci = MOI.add_constraint(model, comp, MOI.Complements(2*n_cc))
+    else
+        ci = MOI.add_constraint(model, comp, S(2*n_cc))
+    end
     return ci, equalities
 end

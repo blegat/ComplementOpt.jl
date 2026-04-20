@@ -20,22 +20,29 @@ MOI.Bridges.Constraint.bridges(model::Optimizer) = model.constraint_map
 # No variable bridge
 MOI.Bridges.is_bridged(::Optimizer, ::Type{<:MOI.AbstractSet}) = false
 
-# But the variable bridged are still handled by this layer by creating variables
-# and then a constraint bridge
+# Complements and ComplementsWithSetType are bridged
 MOI.Bridges.is_bridged(::Optimizer, ::Type{MOI.Complements}) = true
 MOI.Bridges.supports_bridging_constrained_variable(::Optimizer, ::Type{MOI.Complements}) =
     true
-MOI.Bridges.bridge_type(::Optimizer, ::Type{MOI.Complements}) = NonlinearBridge
+MOI.Bridges.bridge_type(::Optimizer, ::Type{MOI.Complements}) = SpecifySetTypeBridge
+
+MOI.Bridges.is_bridged(::Optimizer, ::Type{<:ComplementsWithSetType}) = true
+MOI.Bridges.supports_bridging_constrained_variable(
+    ::Optimizer,
+    ::Type{<:ComplementsWithSetType},
+) = true
 
 # No objective bridge
 MOI.Bridges.is_bridged(::Optimizer, ::Type{<:MOI.AbstractFunction}) = false
 
-# We only bridge complements constraints
+# We only bridge Complements and ComplementsWithSetType constraints
 MOI.Bridges.is_bridged(
     ::Optimizer,
     ::Type{<:MOI.AbstractFunction},
     ::Type{<:MOI.AbstractSet},
 ) = false
+
+# Expression-based Complements → VerticalBridge
 MOI.Bridges.is_bridged(
     ::Optimizer,
     ::Type{<:MOI.AbstractVectorFunction},
@@ -50,13 +57,42 @@ MOI.Bridges.bridge_type(
     ::Optimizer,
     ::Type{<:MOI.AbstractVectorFunction},
     ::Type{MOI.Complements},
-) = VerticalBridge
+) = VerticalBridge{MOI.Complements}
 
+# VectorOfVariables-in-Complements → SpecifySetTypeBridge
 MOI.Bridges.bridge_type(
     ::Optimizer,
     ::Type{<:MOI.VectorOfVariables},
     ::Type{MOI.Complements},
-) = NonlinearBridge
+) = SpecifySetTypeBridge
+
+# ComplementsWithSetType{S} → NonlinearBridge{S} for all S
+MOI.Bridges.is_bridged(
+    ::Optimizer,
+    ::Type{<:MOI.AbstractVectorFunction},
+    ::Type{<:ComplementsWithSetType},
+) = true
+MOI.Bridges.supports_bridging_constraint(
+    ::Optimizer,
+    ::Type{<:MOI.AbstractVectorFunction},
+    ::Type{<:ComplementsWithSetType},
+) = true
+
+function MOI.Bridges.bridge_type(
+    ::Optimizer,
+    ::Type{<:MOI.VectorOfVariables},
+    ::Type{ComplementsWithSetType{S}},
+) where {S}
+    return NonlinearBridge{S}
+end
+
+function MOI.Bridges.bridge_type(
+    ::Optimizer,
+    ::Type{<:MOI.AbstractVectorFunction},
+    ::Type{ComplementsWithSetType{S}},
+) where {S}
+    return NonlinearBridge{S}
+end
 
 function MOI.Bridges.bridging_cost(b::Optimizer, args...)
     return MOI.Bridges.bridging_cost(MOI.Bridges.bridge_type(b, args...))
@@ -80,7 +116,7 @@ MOI.Utilities.map_indices(::Function, relax::AbstractComplementarityRelaxation) 
 
 _additional_arguments(::Optimizer, ::Type) = tuple()
 
-function _additional_arguments(model::Optimizer, ::Type{NonlinearBridge})
+function _additional_arguments(model::Optimizer, ::Type{<:NonlinearBridge})
     # Create a 1-element tuple since it is splatted in `add_bridged_constraint`
     return (model.reformulation,)
 end

@@ -1,23 +1,23 @@
-mutable struct NonlinearBridge <: MOI.Bridges.Constraint.AbstractBridge
+mutable struct NonlinearBridge{S} <: MOI.Bridges.Constraint.AbstractBridge
     constraints::Vector
     func::MOI.VectorOfVariables
-    set::MOI.Complements
+    set::ComplementsWithSetType{S}
     reformulation::AbstractComplementarityRelaxation
 end
 
 function MOI.Bridges.Constraint.bridge_constraint(
-    ::Type{NonlinearBridge},
+    ::Type{NonlinearBridge{S}},
     model::MOI.ModelLike,
     func::MOI.VectorOfVariables,
-    set::MOI.Complements,
+    set::ComplementsWithSetType{S},
     # Only `ComplementOpt.Optimizer` supports setting custom bridge arguments
     # so the default will be used when the bridge is added for instance to
     # `MOI.Bridges.LazyBridgeOptimizer`
     reformulation::AbstractComplementarityRelaxation = ScholtesRelaxation(0.0),
-)
+) where {S}
     # Delay reformulation until `final_touch` so that per-constraint
     # `ComplementarityReformulation` attributes can override it first.
-    return NonlinearBridge([], func, set, reformulation)
+    return NonlinearBridge{S}([], func, set, reformulation)
 end
 
 MOI.supports(::MOI.ModelLike, ::ComplementarityReformulation, ::Type{<:NonlinearBridge}) =
@@ -51,35 +51,45 @@ function MOI.Bridges.final_touch(bridge::NonlinearBridge, model::MOI.ModelLike)
     return
 end
 
+# Bound helpers: extract the relevant bounds based on the set type S.
+_complementarity_bounds(::Type{MOI.Nonnegatives}, model, ::Type{T}, x2) where {T} =
+    (zero(T), T(Inf))
+_complementarity_bounds(::Type{MOI.Nonpositives}, model, ::Type{T}, x2) where {T} =
+    (T(-Inf), zero(T))
+_complementarity_bounds(::Type{MOI.Zeros}, model, ::Type{T}, x2) where {T} =
+    (zero(T), zero(T))
+function _complementarity_bounds(::Type{<:MOI.GreaterThan}, model, ::Type{T}, x2) where {T}
+    return (MOIU.get_bounds(model, T, x2)[1], T(Inf))
+end
+function _complementarity_bounds(::Type{<:MOI.LessThan}, model, ::Type{T}, x2) where {T}
+    return (T(-Inf), MOIU.get_bounds(model, T, x2)[2])
+end
+function _complementarity_bounds(::Type{<:MOI.Interval}, model, ::Type{T}, x2) where {T}
+    return MOIU.get_bounds(model, T, x2)
+end
+
 """
-    reformulate_as_nonlinear_program!(model::MOI.ModelLike, relaxation::AbstractComplementarityRelaxation)
+    reformulate_as_nonlinear_program!(model, relaxation, fun, set::ComplementsWithSetType{S})
 
-Reformulate a MOI model with complementarity constraints written in vertical form
-as a nonlinear program. The second argument specifies the relaxation used to reformulate
-the complementarity constraints.
-
-If the complementarity constraints are not in vertical form, an error is thrown.
+Reformulate complementarity constraints as a nonlinear program using the given
+relaxation. The set type `S` determines which bound case to use.
 
 """
 function reformulate_as_nonlinear_program!(
     model::MOI.ModelLike,
     relaxation::AbstractComplementarityRelaxation,
     fun,
-    set,
-)
+    set::ComplementsWithSetType{S},
+) where {S}
     n_comp = div(set.dimension, 2)
-
     ind_cc = []
-    for cc = 1:n_comp
+    for cc in 1:n_comp
         x1 = fun.variables[cc]
         x2 = fun.variables[cc+n_comp]
-        # Get bounds on x2
-        lb2, ub2 = MOIU.get_bounds(model, Float64, x2)
-        # x2 should have at least one bound, otherwise x1 becomes a fixed variable
-        @assert isfinite(lb2) || isfinite(ub2)
-        if !isinf(lb2) && isinf(ub2)
+        lb2, ub2 = _complementarity_bounds(S, model, Float64, x2)
+        if isinf(ub2)
             idc = _relax_complementarity_lower_bound!(model, relaxation, x1, x2, lb2, ub2)
-        elseif isinf(lb2) && !isinf(ub2)
+        elseif isinf(lb2)
             idc = _relax_complementarity_upper_bound!(model, relaxation, x1, x2, lb2, ub2)
         else
             idc = _relax_complementarity_range!(model, relaxation, x1, x2, lb2, ub2)
