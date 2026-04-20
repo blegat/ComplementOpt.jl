@@ -237,10 +237,7 @@ end
         MOI.set(model, ComplementOpt.DefaultComplementarityReformulation(), relax)
         MOI.Utilities.attach_optimizer(model)
 
-        for test_func in (
-            test_nonlinear_mispecified_1,
-            test_nonlinear_mispecified_2,
-        )
+        for test_func in (test_nonlinear_mispecified_1, test_nonlinear_mispecified_2)
             model = test_func()
             set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
             MOI.set(model, ComplementOpt.DefaultComplementarityReformulation(), relax)

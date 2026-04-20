@@ -25,8 +25,11 @@ function MOI.Bridges.Constraint.bridge_constraint(
     return SpecifySetTypeBridge(MOI.ConstraintIndex[], func, set, nothing)
 end
 
-MOI.supports(::MOI.ModelLike, ::ComplementarityReformulation, ::Type{<:SpecifySetTypeBridge}) =
-    true
+MOI.supports(
+    ::MOI.ModelLike,
+    ::ComplementarityReformulation,
+    ::Type{<:SpecifySetTypeBridge},
+) = true
 
 function MOI.set(
     model::MOI.ModelLike,
@@ -48,7 +51,7 @@ function MOI.Bridges.final_touch(bridge::SpecifySetTypeBridge, model::MOI.ModelL
         return
     end
     n_comp = div(bridge.set.dimension, 2)
-    for cc in 1:n_comp
+    for cc = 1:n_comp
         x1 = bridge.func.variables[cc]
         x2 = bridge.func.variables[cc+n_comp]
         ci = _specify_set_type_pair!(model, Float64, x1, x2)

@@ -83,7 +83,7 @@ function reformulate_as_nonlinear_program!(
 ) where {S}
     n_comp = div(set.dimension, 2)
     ind_cc = []
-    for cc in 1:n_comp
+    for cc = 1:n_comp
         x1 = fun.variables[cc]
         x2 = fun.variables[cc+n_comp]
         lb2, ub2 = _complementarity_bounds(S, model, Float64, x2)

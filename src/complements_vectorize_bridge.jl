@@ -31,13 +31,28 @@ function _vector_set_type(::Type{<:MOI.EqualTo})
     return MOI.Zeros
 end
 
-function _set_constant(::Type{T}, model, ::ComplementsWithSetType{<:MOI.GreaterThan}, x2) where {T}
+function _set_constant(
+    ::Type{T},
+    model,
+    ::ComplementsWithSetType{<:MOI.GreaterThan},
+    x2,
+) where {T}
     return MOIU.get_bounds(model, T, x2)[1]
 end
-function _set_constant(::Type{T}, model, ::ComplementsWithSetType{<:MOI.LessThan}, x2) where {T}
+function _set_constant(
+    ::Type{T},
+    model,
+    ::ComplementsWithSetType{<:MOI.LessThan},
+    x2,
+) where {T}
     return MOIU.get_bounds(model, T, x2)[2]
 end
-function _set_constant(::Type{T}, model, ::ComplementsWithSetType{<:MOI.EqualTo}, x2) where {T}
+function _set_constant(
+    ::Type{T},
+    model,
+    ::ComplementsWithSetType{<:MOI.EqualTo},
+    x2,
+) where {T}
     return MOIU.get_bounds(model, T, x2)[1]
 end
 
@@ -64,8 +79,11 @@ function MOI.Bridges.Constraint.bridge_constraint(
     return ComplementsVectorizeBridge{T}(ci, c)
 end
 
-MOI.supports(::MOI.ModelLike, ::ComplementarityReformulation, ::Type{<:ComplementsVectorizeBridge}) =
-    true
+MOI.supports(
+    ::MOI.ModelLike,
+    ::ComplementarityReformulation,
+    ::Type{<:ComplementsVectorizeBridge},
+) = true
 
 function MOI.set(
     model::MOI.ModelLike,
