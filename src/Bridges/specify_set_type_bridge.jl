@@ -23,7 +23,13 @@ function MOI.Bridges.Constraint.bridge_constraint(
     func::MOI.VectorOfVariables,
     set::MOI.Complements,
 ) where {T}
-    return SpecifySetTypeBridge{T}(MOI.ConstraintIndex[], MOI.ConstraintIndex[], func, set, nothing)
+    return SpecifySetTypeBridge{T}(
+        MOI.ConstraintIndex[],
+        MOI.ConstraintIndex[],
+        func,
+        set,
+        nothing,
+    )
 end
 
 function MOI.supports_constraint(
@@ -144,9 +150,7 @@ function MOI.Bridges.added_constrained_variable_types(::Type{<:SpecifySetTypeBri
     return Tuple{Type}[]
 end
 
-function MOI.Bridges.added_constraint_types(
-    ::Type{SpecifySetTypeBridge{T}},
-) where {T}
+function MOI.Bridges.added_constraint_types(::Type{SpecifySetTypeBridge{T}}) where {T}
     return Tuple{Type,Type}[
         (MOI.VectorOfVariables, ComplementsWithSetType{MOI.Nonnegatives}),
         (MOI.VectorOfVariables, ComplementsWithSetType{MOI.Nonpositives}),
@@ -181,24 +185,14 @@ function MOI.get(
     ::MOI.ListOfConstraintIndices{F,S},
 ) where {F,S}
     all_cis = [bridge.constraints; bridge.bounds]
-    return MOI.ConstraintIndex{F,S}[
-        ci for ci in all_cis if ci isa MOI.ConstraintIndex{F,S}
-    ]
+    return MOI.ConstraintIndex{F,S}[ci for ci in all_cis if ci isa MOI.ConstraintIndex{F,S}]
 end
 
-function MOI.get(
-    ::MOI.ModelLike,
-    ::MOI.ConstraintFunction,
-    bridge::SpecifySetTypeBridge,
-)
+function MOI.get(::MOI.ModelLike, ::MOI.ConstraintFunction, bridge::SpecifySetTypeBridge)
     return bridge.func
 end
 
-function MOI.get(
-    ::MOI.ModelLike,
-    ::MOI.ConstraintSet,
-    bridge::SpecifySetTypeBridge,
-)
+function MOI.get(::MOI.ModelLike, ::MOI.ConstraintSet, bridge::SpecifySetTypeBridge)
     return bridge.set
 end
 

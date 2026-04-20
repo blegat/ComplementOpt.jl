@@ -51,17 +51,11 @@ function MOI.get(::NonlinearBridge, ::MOI.ListOfVariableIndices)
     return MOI.VariableIndex[]
 end
 
-function MOI.get(
-    bridge::NonlinearBridge,
-    ::MOI.NumberOfConstraints{F,S},
-)::Int64 where {F,S}
+function MOI.get(bridge::NonlinearBridge, ::MOI.NumberOfConstraints{F,S})::Int64 where {F,S}
     return count(ci -> ci isa MOI.ConstraintIndex{F,S}, bridge.constraints)
 end
 
-function MOI.get(
-    bridge::NonlinearBridge,
-    ::MOI.ListOfConstraintIndices{F,S},
-) where {F,S}
+function MOI.get(bridge::NonlinearBridge, ::MOI.ListOfConstraintIndices{F,S}) where {F,S}
     return MOI.ConstraintIndex{F,S}[
         ci for ci in bridge.constraints if ci isa MOI.ConstraintIndex{F,S}
     ]
