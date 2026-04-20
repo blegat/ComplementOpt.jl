@@ -1,5 +1,5 @@
 """
-    ComplementsVectorizeBridge{T,S} <: MOI.Bridges.Constraint.AbstractBridge
+    ComplementsVectorizeBridge{T,S,SV} <: MOI.Bridges.Constraint.AbstractBridge
 
 Bridge that shifts the slack variable in a complementarity pair to remove
 the bound constant, converting scalar-set-typed complements to vector-set-typed.
@@ -9,9 +9,17 @@ becomes `VectorAffineFunction([x1, x2 - lb])`-in-`ComplementsWithSetType{Nonnega
 
 Inspired by `MOI.Bridges.Constraint.VectorizeBridge`.
 
+The type parameters are:
+- `T`: coefficient type
+- `S`: input scalar set type (e.g., `GreaterThan{T}`)
+- `SV`: output vector set type (e.g., `Nonnegatives`)
+
 """
-struct ComplementsVectorizeBridge{T,S} <: MOI.Bridges.Constraint.AbstractBridge
-    constraint::MOI.ConstraintIndex
+struct ComplementsVectorizeBridge{T,S,SV} <: MOI.Bridges.Constraint.AbstractBridge
+    constraint::MOI.ConstraintIndex{
+        MOI.VectorAffineFunction{T},
+        ComplementsWithSetType{SV},
+    }
     set_constant::T
 end
 
@@ -51,16 +59,15 @@ function _set_constant(
 end
 
 function MOI.Bridges.Constraint.bridge_constraint(
-    ::Type{ComplementsVectorizeBridge{T,S}},
+    ::Type{ComplementsVectorizeBridge{T,S,SV}},
     model::MOI.ModelLike,
     func::MOI.VectorOfVariables,
     set::ComplementsWithSetType{S},
-) where {T,S}
+) where {T,S,SV}
     @assert set.dimension == 2
     x1 = func.variables[1]
     x2 = func.variables[2]
     c = _set_constant(T, model, set, x2)
-    # Build VectorAffineFunction: [1*x1 + 0, 1*x2 - c]
     vec_f = MOI.VectorAffineFunction{T}(
         [
             MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(one(T), x1)),
@@ -68,9 +75,8 @@ function MOI.Bridges.Constraint.bridge_constraint(
         ],
         T[zero(T), -c],
     )
-    S_vec = _vector_set_type(S)
-    ci = MOI.add_constraint(model, vec_f, ComplementsWithSetType{S_vec}(2))
-    return ComplementsVectorizeBridge{T,S}(ci, c)
+    ci = MOI.add_constraint(model, vec_f, ComplementsWithSetType{SV}(2))
+    return ComplementsVectorizeBridge{T,S,SV}(ci, c)
 end
 
 function MOI.supports_constraint(
@@ -86,7 +92,8 @@ function MOI.Bridges.Constraint.concrete_bridge_type(
     ::Type{MOI.VectorOfVariables},
     ::Type{ComplementsWithSetType{S}},
 ) where {T,S<:Union{MOI.GreaterThan,MOI.LessThan,MOI.EqualTo}}
-    return ComplementsVectorizeBridge{T,S}
+    SV = _vector_set_type(S)
+    return ComplementsVectorizeBridge{T,S,SV}
 end
 
 MOI.supports(
@@ -112,12 +119,10 @@ function MOI.Bridges.added_constrained_variable_types(::Type{<:ComplementsVector
 end
 
 function MOI.Bridges.added_constraint_types(
-    ::Type{<:ComplementsVectorizeBridge{T}},
-) where {T}
+    ::Type{ComplementsVectorizeBridge{T,S,SV}},
+) where {T,S,SV}
     return Tuple{Type,Type}[
-        (MOI.VectorAffineFunction{T}, ComplementsWithSetType{MOI.Nonnegatives}),
-        (MOI.VectorAffineFunction{T}, ComplementsWithSetType{MOI.Nonpositives}),
-        (MOI.VectorAffineFunction{T}, ComplementsWithSetType{MOI.Zeros}),
+        (MOI.VectorAffineFunction{T}, ComplementsWithSetType{SV}),
     ]
 end
 
@@ -130,20 +135,20 @@ function MOI.get(::ComplementsVectorizeBridge, ::MOI.ListOfVariableIndices)
 end
 
 function MOI.get(
-    bridge::ComplementsVectorizeBridge{T},
-    ::MOI.NumberOfConstraints{MOI.VectorAffineFunction{T},S},
-)::Int64 where {T,S<:ComplementsWithSetType}
-    return bridge.constraint isa MOI.ConstraintIndex{MOI.VectorAffineFunction{T},S} ? 1 : 0
+    ::ComplementsVectorizeBridge{T,S,SV},
+    ::MOI.NumberOfConstraints{MOI.VectorAffineFunction{T},ComplementsWithSetType{SV}},
+)::Int64 where {T,S,SV}
+    return 1
 end
 
 function MOI.get(
-    bridge::ComplementsVectorizeBridge{T},
-    ::MOI.ListOfConstraintIndices{MOI.VectorAffineFunction{T},S},
-) where {T,S<:ComplementsWithSetType}
-    if bridge.constraint isa MOI.ConstraintIndex{MOI.VectorAffineFunction{T},S}
-        return [bridge.constraint]
-    end
-    return MOI.ConstraintIndex{MOI.VectorAffineFunction{T},S}[]
+    bridge::ComplementsVectorizeBridge{T,S,SV},
+    ::MOI.ListOfConstraintIndices{
+        MOI.VectorAffineFunction{T},
+        ComplementsWithSetType{SV},
+    },
+) where {T,S,SV}
+    return [bridge.constraint]
 end
 
 function MOI.get(
