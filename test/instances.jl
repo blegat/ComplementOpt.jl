@@ -97,7 +97,7 @@ function design_centering_model()
     @constraint(model, 0.00 + 2.0 * (y[1, 3] - x[1]) * l[3] == 0.0)
     @constraint(model, 1.00 + 2.0 * (y[2, 3] - x[2]) * l[3] == 0.0)
     # complementarity
-    for k = 1:3
+    for k in 1:3
         @constraint(
             model,
             [-(y[1, k] - x[1])^2 - (y[2, k] - x[2])^2 + x[3]^2, l[k]] ∈ MOI.Complements(2)
@@ -140,7 +140,7 @@ function desilva_model()
     @variable(model, y[1:2])
     @variable(model, 0.0 <= l[1:2])
     @objective(model, Min, x[1]^2 - 2*x[1] + x[2]^2 - 2*x[2] + y[1]^2 + y[2]^2)
-    for i = 1:2
+    for i in 1:2
         @constraint(model, 2.0*y[i] - 2.0*x[i] + 2.0 * (y[i] - 1.0) * l[i] == 0.0)
         @constraint(model, [0.25 - (y[i] - 1.0)^2, l[i]] ∈ MOI.Complements(2))
     end
@@ -214,8 +214,8 @@ function hakonsen_model_broken()
         consum2[i=1:2],
         [(x[i] * (3.0 * p[i] * (1+t[i])) - 100.0 * pL), p[i]] ∈ MOI.Complements(2)
     )
-    @constraint(model, L*pL == sum(x[i] * p[i] for i = 1:2) + l*pL + G)
-    @constraint(model, revenue, sum(p[i] * t[i] * x[i] for i = 1:2) >= G)
+    @constraint(model, L*pL == sum(x[i] * p[i] for i in 1:2) + l*pL + G)
+    @constraint(model, revenue, sum(p[i] * t[i] * x[i] for i in 1:2) >= G)
     return model
 end
 
@@ -237,7 +237,11 @@ function qpec2_model()
     @variable(model, x[1:n], start=1.0)
     @variable(model, y[1:m] >= 0.0, start=1.0)
     @variable(model, s[1:n] >= 0.0)
-    @objective(model, Min, sum((x[i] + rr)^2 for i = 1:n) + sum((y[j] + ss)^2 for j = 1:m))
+    @objective(
+        model,
+        Min,
+        sum((x[i] + rr)^2 for i in 1:n) + sum((y[j] + ss)^2 for j in 1:m)
+    )
 
     @constraint(model, [i=1:n], y[i] - x[i] >= 0.0)
     @constraint(model, [i=1:n], [(y[i] - x[i]), y[i]] ∈ MOI.Complements(2))

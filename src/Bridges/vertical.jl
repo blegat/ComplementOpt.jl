@@ -74,7 +74,7 @@ function _parse_complementarity_constraint(fun::MOI.AbstractVectorFunction, n_co
     cc_lhs = MOI.AbstractScalarFunction[]
     cc_rhs = MOI.VariableIndex[]
 
-    for i = 1:n_comp
+    for i in 1:n_comp
         # Parse LHS
         t1 = exprs[i]
         t2 = exprs[i+n_comp]
