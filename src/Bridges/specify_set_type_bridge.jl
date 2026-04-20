@@ -54,7 +54,7 @@ function MOI.Bridges.final_touch(
         return
     end
     n_comp = div(bridge.set.dimension, 2)
-    for cc = 1:n_comp
+    for cc in 1:n_comp
         x1 = bridge.func.variables[cc]
         x2 = bridge.func.variables[cc+n_comp]
         ci = _specify_set_type_pair!(model, T, x1, x2)
