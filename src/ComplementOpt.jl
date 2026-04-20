@@ -8,12 +8,7 @@ include("attributes.jl")
 include("sets.jl")
 include("Bridges/Bridges.jl")
 
-# Re-export bridge types and relaxation types at the ComplementOpt level
 using .Bridges:
-    VerticalBridge,
-    SpecifySetTypeBridge,
-    ComplementsVectorizeBridge,
-    NonlinearBridge,
     ScholtesRelaxation,
     FischerBurmeisterRelaxation,
     LiuFukushimaRelaxation,
