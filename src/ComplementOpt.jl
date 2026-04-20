@@ -6,11 +6,20 @@ const MOIU = MOI.Utilities
 include("utils.jl")
 include("attributes.jl")
 include("sets.jl")
-include("vertical.jl")
-include("specify_set_type_bridge.jl")
-include("complements_vectorize_bridge.jl")
-include("nonlinear.jl")
-include("sos1.jl")
+include("Bridges/Bridges.jl")
+
+# Re-export bridge types and relaxation types at the ComplementOpt level
+using .Bridges:
+    VerticalBridge,
+    SpecifySetTypeBridge,
+    ComplementsVectorizeBridge,
+    NonlinearBridge,
+    ScholtesRelaxation,
+    FischerBurmeisterRelaxation,
+    LiuFukushimaRelaxation,
+    KanzowSchwarzRelaxation,
+    SOS1Relaxation
+
 include("MOI_wrapper.jl")
 
 end # module ComplementOpt
