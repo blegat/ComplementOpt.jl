@@ -1,5 +1,5 @@
 """
-    ComplementsVectorizeBridge{T,S,SV} <: MOI.Bridges.Constraint.AbstractBridge
+    ComplementsVectorizeBridge{T,F,S,SV} <: MOI.Bridges.Constraint.AbstractBridge
 
 Bridge that shifts the slack variable in a complementarity pair to remove
 the bound constant, converting scalar-set-typed complements to vector-set-typed.
@@ -11,12 +11,13 @@ Inspired by `MOI.Bridges.Constraint.VectorizeBridge`.
 
 The type parameters are:
 - `T`: coefficient type
+- `F`: output vector function type (determined by `promote_operation`)
 - `S`: input scalar set type (e.g., `GreaterThan{T}`)
 - `SV`: output vector set type (e.g., `Nonnegatives`)
 
 """
-struct ComplementsVectorizeBridge{T,S,SV} <: MOI.Bridges.Constraint.AbstractBridge
-    constraint::MOI.ConstraintIndex{MOI.VectorAffineFunction{T},ComplementsWithSetType{SV}}
+struct ComplementsVectorizeBridge{T,F,S,SV} <: MOI.Bridges.Constraint.AbstractBridge
+    constraint::MOI.ConstraintIndex{F,ComplementsWithSetType{SV}}
     set_constant::T
 end
 
@@ -56,24 +57,19 @@ function _set_constant(
 end
 
 function MOI.Bridges.Constraint.bridge_constraint(
-    ::Type{ComplementsVectorizeBridge{T,S,SV}},
+    ::Type{ComplementsVectorizeBridge{T,F,S,SV}},
     model::MOI.ModelLike,
     func::MOI.VectorOfVariables,
     set::ComplementsWithSetType{S},
-) where {T,S,SV}
+) where {T,F,S,SV}
     @assert set.dimension == 2
     x1 = func.variables[1]
     x2 = func.variables[2]
     c = _set_constant(T, model, set, x2)
-    vec_f = MOI.VectorAffineFunction{T}(
-        [
-            MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(one(T), x1)),
-            MOI.VectorAffineTerm(2, MOI.ScalarAffineTerm(one(T), x2)),
-        ],
-        T[zero(T), -c],
-    )
-    ci = MOI.add_constraint(model, vec_f, ComplementsWithSetType{SV}(2))
-    return ComplementsVectorizeBridge{T,S,SV}(ci, c)
+    # Shift only x2: [x1, x2] → [x1, x2 - c]
+    shifted = MOIU.operate(vcat, T, one(T) * x1, one(T) * x2 - c)
+    ci = MOI.add_constraint(model, shifted, ComplementsWithSetType{SV}(2))
+    return ComplementsVectorizeBridge{T,F,S,SV}(ci, c)
 end
 
 function MOI.supports_constraint(
@@ -89,8 +85,10 @@ function MOI.Bridges.Constraint.concrete_bridge_type(
     ::Type{MOI.VectorOfVariables},
     ::Type{ComplementsWithSetType{S}},
 ) where {T,S<:Union{MOI.GreaterThan,MOI.LessThan,MOI.EqualTo}}
+    G = MOI.Utilities.promote_operation(-, T, MOI.VariableIndex, T)
+    F = MOI.Utilities.promote_operation(vcat, T, G, G)
     SV = _vector_set_type(S)
-    return ComplementsVectorizeBridge{T,S,SV}
+    return ComplementsVectorizeBridge{T,F,S,SV}
 end
 
 MOI.supports(
@@ -116,9 +114,9 @@ function MOI.Bridges.added_constrained_variable_types(::Type{<:ComplementsVector
 end
 
 function MOI.Bridges.added_constraint_types(
-    ::Type{ComplementsVectorizeBridge{T,S,SV}},
-) where {T,S,SV}
-    return Tuple{Type,Type}[(MOI.VectorAffineFunction{T}, ComplementsWithSetType{SV}),]
+    ::Type{ComplementsVectorizeBridge{T,F,S,SV}},
+) where {T,F,S,SV}
+    return Tuple{Type,Type}[(F, ComplementsWithSetType{SV})]
 end
 
 function MOI.get(::ComplementsVectorizeBridge, ::MOI.NumberOfVariables)::Int64
@@ -130,16 +128,16 @@ function MOI.get(::ComplementsVectorizeBridge, ::MOI.ListOfVariableIndices)
 end
 
 function MOI.get(
-    ::ComplementsVectorizeBridge{T,S,SV},
-    ::MOI.NumberOfConstraints{MOI.VectorAffineFunction{T},ComplementsWithSetType{SV}},
-)::Int64 where {T,S,SV}
+    ::ComplementsVectorizeBridge{T,F,S,SV},
+    ::MOI.NumberOfConstraints{F,ComplementsWithSetType{SV}},
+)::Int64 where {T,F,S,SV}
     return 1
 end
 
 function MOI.get(
-    bridge::ComplementsVectorizeBridge{T,S,SV},
-    ::MOI.ListOfConstraintIndices{MOI.VectorAffineFunction{T},ComplementsWithSetType{SV}},
-) where {T,S,SV}
+    bridge::ComplementsVectorizeBridge{T,F,S,SV},
+    ::MOI.ListOfConstraintIndices{F,ComplementsWithSetType{SV}},
+) where {T,F,S,SV}
     return [bridge.constraint]
 end
 
@@ -157,8 +155,8 @@ end
 function MOI.get(
     ::MOI.ModelLike,
     ::MOI.ConstraintSet,
-    ::ComplementsVectorizeBridge{T,S},
-) where {T,S}
+    ::ComplementsVectorizeBridge{T,F,S},
+) where {T,F,S}
     return ComplementsWithSetType{S}(2)
 end
 
