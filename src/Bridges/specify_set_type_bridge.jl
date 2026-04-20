@@ -1,5 +1,5 @@
 """
-    SpecifySetTypeBridge <: MOI.Bridges.Constraint.AbstractBridge
+    SpecifySetTypeBridge{T} <: MOI.Bridges.Constraint.AbstractBridge
 
 Bridge that converts a `VectorOfVariables`-in-`Complements` constraint into
 per-pair `VectorOfVariables`-in-`ComplementsWithSetType{S}` constraints, where
@@ -9,7 +9,7 @@ No slack variables are created — this bridge only classifies each pair and add
 the appropriate bound on the activity variable `x₁`.
 
 """
-mutable struct SpecifySetTypeBridge <: MOI.Bridges.Constraint.AbstractBridge
+mutable struct SpecifySetTypeBridge{T} <: MOI.Bridges.Constraint.AbstractBridge
     constraints::Vector{MOI.ConstraintIndex}
     func::MOI.VectorOfVariables
     set::MOI.Complements
@@ -17,12 +17,12 @@ mutable struct SpecifySetTypeBridge <: MOI.Bridges.Constraint.AbstractBridge
 end
 
 function MOI.Bridges.Constraint.bridge_constraint(
-    ::Type{SpecifySetTypeBridge},
+    ::Type{SpecifySetTypeBridge{T}},
     model::MOI.ModelLike,
     func::MOI.VectorOfVariables,
     set::MOI.Complements,
-)
-    return SpecifySetTypeBridge(MOI.ConstraintIndex[], func, set, nothing)
+) where {T}
+    return SpecifySetTypeBridge{T}(MOI.ConstraintIndex[], func, set, nothing)
 end
 
 MOI.supports(
@@ -46,15 +46,18 @@ end
 
 MOI.Bridges.needs_final_touch(::SpecifySetTypeBridge) = true
 
-function MOI.Bridges.final_touch(bridge::SpecifySetTypeBridge, model::MOI.ModelLike)
+function MOI.Bridges.final_touch(
+    bridge::SpecifySetTypeBridge{T},
+    model::MOI.ModelLike,
+) where {T}
     if !isempty(bridge.constraints)
         return
     end
     n_comp = div(bridge.set.dimension, 2)
-    for cc = 1:n_comp
+    for cc in 1:n_comp
         x1 = bridge.func.variables[cc]
         x2 = bridge.func.variables[cc+n_comp]
-        ci = _specify_set_type_pair!(model, Float64, x1, x2)
+        ci = _specify_set_type_pair!(model, T, x1, x2)
         push!(bridge.constraints, ci)
     end
     if bridge.reformulation !== nothing
@@ -74,8 +77,7 @@ function _specify_set_type_pair!(model, ::Type{T}, x1, x2) where {T}
     elseif isfinite(lb2) && isfinite(ub2)
         return _specify_range!(model, T, x1, x2, lb2, ub2)
     else
-        # Both infinite: x1 must be zero
-        MOI.add_constraint(model, 1.0 * x1, MOI.EqualTo(zero(T)))
+        MOI.add_constraint(model, one(T) * x1, MOI.EqualTo(zero(T)))
         return MOI.add_constraint(
             model,
             MOI.VectorOfVariables([x1, x2]),
