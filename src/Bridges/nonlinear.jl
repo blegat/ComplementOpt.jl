@@ -1,3 +1,32 @@
+"""
+    NonlinearBridge{S} <: MOI.Bridges.Constraint.AbstractBridge
+
+`NonlinearBridge` implements the following reformulation:
+
+  * `[x₁, x₂]` in [`ComplementsWithSetType{S}`](@ref) into nonlinear
+    constraints using a complementarity relaxation method
+
+The relaxation method is determined by the
+[`AbstractComplementarityRelaxation`](@ref) attribute (default:
+[`ScholtesRelaxation`](@ref)). The set type `S` determines the bound case:
+
+  * `S <: Union{MOI.Nonnegatives, MOI.GreaterThan}`: lower-bound relaxation
+  * `S <: Union{MOI.Nonpositives, MOI.LessThan}`: upper-bound relaxation
+  * `S <: MOI.Interval`: range relaxation
+  * `S == MOI.Zeros`: equality (trivial complementarity)
+
+## Source node
+
+`NonlinearBridge` supports:
+
+  * [`MOI.VectorOfVariables`](@ref) in [`ComplementsWithSetType{S}`](@ref)
+
+## Target nodes
+
+`NonlinearBridge` creates nonlinear constraints depending on the relaxation
+method (for example, quadratic or `ScalarNonlinearFunction` constraints).
+
+"""
 mutable struct NonlinearBridge{S} <: MOI.Bridges.Constraint.AbstractBridge
     constraints::Vector
     func::MOI.VectorOfVariables

@@ -1,3 +1,31 @@
+"""
+    VerticalBridge{S} <: MOI.Bridges.Constraint.AbstractBridge
+
+`VerticalBridge` implements the following reformulation:
+
+  * `f(x)` in `S` into `[x₁, x₂]` in `S`
+
+where expression-based complementarity constraints are converted to vertical
+form by introducing slack variables. If the left-hand side is an expression,
+a slack variable `x₁` is created with an equality `lhs = x₁`. If the
+right-hand side variable `x₂` is unbounded, the left-hand side is converted
+to an equality constraint instead.
+
+## Source node
+
+`VerticalBridge` supports:
+
+  * [`MOI.AbstractVectorFunction`](@ref) in [`MOI.Complements`](@ref)
+  * [`MOI.AbstractVectorFunction`](@ref) in [`ComplementsWithSetType{S}`](@ref)
+
+## Target nodes
+
+`VerticalBridge` creates:
+
+  * [`MOI.VectorOfVariables`](@ref) in `S`
+  * [`MOI.ScalarAffineFunction{Float64}`](@ref) in [`MOI.EqualTo{Float64}`](@ref)
+
+"""
 struct VerticalBridge{S<:MOI.AbstractVectorSet} <: MOI.Bridges.Constraint.AbstractBridge
     constraint::MOI.ConstraintIndex{MOI.VectorOfVariables,S}
     equalities::Vector{MOI.ConstraintIndex}
