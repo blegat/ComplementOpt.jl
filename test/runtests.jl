@@ -507,3 +507,5 @@ end
     @test MOI.get(model, attr, c) == reformulation
     @test JuMP.is_solved_and_feasible(model)
 end
+
+include(joinpath(@__DIR__, "Bridges", "runtests.jl"))
