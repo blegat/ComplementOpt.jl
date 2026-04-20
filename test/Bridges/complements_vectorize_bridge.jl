@@ -5,7 +5,7 @@ using ComplementOpt
 @testset "ComplementsVectorizeBridge" begin
     @testset "GreaterThan → Nonnegatives" begin
         MOI.Bridges.runtests(
-            ComplementOpt.ComplementsVectorizeBridge{Float64},
+            ComplementOpt.Bridges.ComplementsVectorizeBridge{Float64},
             model -> begin
                 x, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
                 y, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(3.0))
@@ -37,7 +37,7 @@ using ComplementOpt
 
     @testset "LessThan → Nonpositives" begin
         MOI.Bridges.runtests(
-            ComplementOpt.ComplementsVectorizeBridge{Float64},
+            ComplementOpt.Bridges.ComplementsVectorizeBridge{Float64},
             model -> begin
                 x, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
                 y, _ = MOI.add_constrained_variable(model, MOI.LessThan(-2.0))

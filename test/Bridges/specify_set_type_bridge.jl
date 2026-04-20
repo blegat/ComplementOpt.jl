@@ -5,7 +5,7 @@ using ComplementOpt
 @testset "SpecifySetTypeBridge" begin
     @testset "Lower bound (Nonnegatives)" begin
         MOI.Bridges.runtests(
-            ComplementOpt.SpecifySetTypeBridge,
+            ComplementOpt.Bridges.SpecifySetTypeBridge,
             model -> begin
                 x, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
                 y, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
@@ -30,7 +30,7 @@ using ComplementOpt
 
     @testset "Lower bound (GreaterThan)" begin
         MOI.Bridges.runtests(
-            ComplementOpt.SpecifySetTypeBridge,
+            ComplementOpt.Bridges.SpecifySetTypeBridge,
             model -> begin
                 x = MOI.add_variable(model)
                 y, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(3.0))
@@ -55,7 +55,7 @@ using ComplementOpt
 
     @testset "Upper bound (Nonpositives)" begin
         MOI.Bridges.runtests(
-            ComplementOpt.SpecifySetTypeBridge,
+            ComplementOpt.Bridges.SpecifySetTypeBridge,
             model -> begin
                 x = MOI.add_variable(model)
                 y, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
@@ -80,7 +80,7 @@ using ComplementOpt
 
     @testset "Upper bound (LessThan)" begin
         MOI.Bridges.runtests(
-            ComplementOpt.SpecifySetTypeBridge,
+            ComplementOpt.Bridges.SpecifySetTypeBridge,
             model -> begin
                 x = MOI.add_variable(model)
                 y, _ = MOI.add_constrained_variable(model, MOI.LessThan(-2.0))
@@ -105,7 +105,7 @@ using ComplementOpt
 
     @testset "Range (Interval)" begin
         MOI.Bridges.runtests(
-            ComplementOpt.SpecifySetTypeBridge,
+            ComplementOpt.Bridges.SpecifySetTypeBridge,
             model -> begin
                 x = MOI.add_variable(model)
                 y, _ = MOI.add_constrained_variable(model, MOI.Interval(0.0, 1.0))
