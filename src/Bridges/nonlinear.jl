@@ -33,6 +33,47 @@ function MOI.set(
     return
 end
 
+# Bridge metadata
+
+function MOI.Bridges.added_constrained_variable_types(::Type{<:NonlinearBridge})
+    return Tuple{Type}[]
+end
+
+function MOI.Bridges.added_constraint_types(::Type{<:NonlinearBridge})
+    return Tuple{Type,Type}[]
+end
+
+function MOI.get(::NonlinearBridge, ::MOI.NumberOfVariables)::Int64
+    return 0
+end
+
+function MOI.get(::NonlinearBridge, ::MOI.ListOfVariableIndices)
+    return MOI.VariableIndex[]
+end
+
+function MOI.get(
+    bridge::NonlinearBridge,
+    ::MOI.NumberOfConstraints{F,S},
+)::Int64 where {F,S}
+    return count(ci -> ci isa MOI.ConstraintIndex{F,S}, bridge.constraints)
+end
+
+function MOI.get(
+    bridge::NonlinearBridge,
+    ::MOI.ListOfConstraintIndices{F,S},
+) where {F,S}
+    return MOI.ConstraintIndex{F,S}[
+        ci for ci in bridge.constraints if ci isa MOI.ConstraintIndex{F,S}
+    ]
+end
+
+function MOI.delete(model::MOI.ModelLike, bridge::NonlinearBridge)
+    for ci in bridge.constraints
+        MOI.delete(model, ci)
+    end
+    return
+end
+
 MOI.Bridges.needs_final_touch(::NonlinearBridge) = true
 
 function MOI.Bridges.final_touch(bridge::NonlinearBridge, model::MOI.ModelLike)

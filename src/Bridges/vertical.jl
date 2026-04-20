@@ -23,6 +23,46 @@ function MOI.Bridges.Constraint.bridge_constraint(
     )
 end
 
+# Bridge metadata
+
+function MOI.Bridges.added_constrained_variable_types(::Type{<:VerticalBridge})
+    return Tuple{Type}[]
+end
+
+function MOI.Bridges.added_constraint_types(::Type{VerticalBridge{S}}) where {S}
+    return Tuple{Type,Type}[(MOI.VectorOfVariables, S)]
+end
+
+function MOI.get(::VerticalBridge, ::MOI.NumberOfVariables)::Int64
+    return 0
+end
+
+function MOI.get(::VerticalBridge, ::MOI.ListOfVariableIndices)
+    return MOI.VariableIndex[]
+end
+
+function MOI.get(
+    ::VerticalBridge{S},
+    ::MOI.NumberOfConstraints{MOI.VectorOfVariables,S},
+)::Int64 where {S}
+    return 1
+end
+
+function MOI.get(
+    bridge::VerticalBridge{S},
+    ::MOI.ListOfConstraintIndices{MOI.VectorOfVariables,S},
+) where {S}
+    return [bridge.constraint]
+end
+
+function MOI.delete(model::MOI.ModelLike, bridge::VerticalBridge)
+    MOI.delete(model, bridge.constraint)
+    for ci in bridge.equalities
+        MOI.delete(model, ci)
+    end
+    return
+end
+
 MOI.supports(::MOI.ModelLike, ::ComplementarityReformulation, ::Type{<:VerticalBridge}) =
     true
 

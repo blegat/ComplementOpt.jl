@@ -24,8 +24,7 @@ MOI.Bridges.is_bridged(::Optimizer, ::Type{<:MOI.AbstractSet}) = false
 MOI.Bridges.is_bridged(::Optimizer, ::Type{MOI.Complements}) = true
 MOI.Bridges.supports_bridging_constrained_variable(::Optimizer, ::Type{MOI.Complements}) =
     true
-MOI.Bridges.bridge_type(::Optimizer, ::Type{MOI.Complements}) =
-    Bridges.SpecifySetTypeBridge{Float64}
+MOI.Bridges.bridge_type(::Optimizer, ::Type{MOI.Complements}) = SpecifySetTypeBridge{Float64}
 
 MOI.Bridges.is_bridged(::Optimizer, ::Type{<:ComplementsWithSetType}) = true
 MOI.Bridges.supports_bridging_constrained_variable(
