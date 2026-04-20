@@ -42,11 +42,7 @@ function _relax_complementarity_lower_bound!(
     # Create slack s = x2 - lb2 >= 0
     s, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
     eq = MOI.add_constraint(model, 1.0 * x2 - 1.0 * s, MOI.EqualTo(lb2))
-    sos = MOI.add_constraint(
-        model,
-        MOI.VectorOfVariables([x1, s]),
-        MOI.SOS1([1.0, 2.0]),
-    )
+    sos = MOI.add_constraint(model, MOI.VectorOfVariables([x1, s]), MOI.SOS1([1.0, 2.0]))
     return [eq, sos]
 end
 
@@ -71,11 +67,7 @@ function _relax_complementarity_upper_bound!(
     # s2 = ub2 - x2 >= 0
     s2, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
     eq2 = MOI.add_constraint(model, 1.0 * x2 + 1.0 * s2, MOI.EqualTo(ub2))
-    sos = MOI.add_constraint(
-        model,
-        MOI.VectorOfVariables([s1, s2]),
-        MOI.SOS1([1.0, 2.0]),
-    )
+    sos = MOI.add_constraint(model, MOI.VectorOfVariables([s1, s2]), MOI.SOS1([1.0, 2.0]))
     return [eq1, eq2, sos]
 end
 
@@ -104,11 +96,7 @@ function _relax_complementarity_range!(
     if isfinite(ub_q)
         MOI.add_constraint(model, q, MOI.LessThan(ub_q))
     end
-    eq_split = MOI.add_constraint(
-        model,
-        1.0 * x1 - 1.0 * p + 1.0 * q,
-        MOI.EqualTo(0.0),
-    )
+    eq_split = MOI.add_constraint(model, 1.0 * x1 - 1.0 * p + 1.0 * q, MOI.EqualTo(0.0))
     # s_lb = x2 - lb2 ∈ [0, range2]
     s_lb, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
     MOI.add_constraint(model, s_lb, MOI.LessThan(range2))
@@ -118,15 +106,7 @@ function _relax_complementarity_range!(
     MOI.add_constraint(model, s_ub, MOI.LessThan(range2))
     eq_ub = MOI.add_constraint(model, 1.0 * x2 + 1.0 * s_ub, MOI.EqualTo(ub2))
     # SOS1 constraints
-    sos1 = MOI.add_constraint(
-        model,
-        MOI.VectorOfVariables([p, s_lb]),
-        MOI.SOS1([1.0, 2.0]),
-    )
-    sos2 = MOI.add_constraint(
-        model,
-        MOI.VectorOfVariables([q, s_ub]),
-        MOI.SOS1([1.0, 2.0]),
-    )
+    sos1 = MOI.add_constraint(model, MOI.VectorOfVariables([p, s_lb]), MOI.SOS1([1.0, 2.0]))
+    sos2 = MOI.add_constraint(model, MOI.VectorOfVariables([q, s_ub]), MOI.SOS1([1.0, 2.0]))
     return [eq_split, eq_lb, eq_ub, sos1, sos2]
 end
