@@ -348,7 +348,7 @@ end
     @test MOI.supports_add_constrained_variables(b, S)
     @test !MOI.Bridges.is_variable_bridged(b, S)
     bridge_type = MOI.Bridges.Constraint.concrete_bridge_type(b, F, S)
-    @test bridge_type == ComplementOpt.SpecifySetTypeBridge
+    @test bridge_type == ComplementOpt.Bridges.SpecifySetTypeBridge{Float64}
     @test MOI.supports(b, attr, bridge_type)
     @test MOI.supports(
         JuMP.unsafe_backend(model),
