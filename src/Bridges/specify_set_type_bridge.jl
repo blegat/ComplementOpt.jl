@@ -1,12 +1,36 @@
 """
     SpecifySetTypeBridge{T} <: MOI.Bridges.Constraint.AbstractBridge
 
-Bridge that converts a `VectorOfVariables`-in-`Complements` constraint into
-per-pair `VectorOfVariables`-in-`ComplementsWithSetType{S}` constraints, where
-`S` is determined by reading each slack variable's bounds.
+`SpecifySetTypeBridge` implements the following reformulation:
 
-No slack variables are created — this bridge only classifies each pair and adds
-the appropriate bound on the activity variable `x₁`.
+  * `(x₁, x₂)` in [`MOI.Complements`](@ref) into `(x₁, x₂)` in
+    [`ComplementsWithSetType{S}`](@ref)
+
+where `S` is determined by the bounds of `x₂`:
+
+  * `x₂ ≥ 0` gives `S = MOI.Nonnegatives`
+  * `x₂ ≥ lb` (lb ≠ 0) gives `S = MOI.GreaterThan{T}`
+  * `x₂ ≤ 0` gives `S = MOI.Nonpositives`
+  * `x₂ ≤ ub` (ub ≠ 0) gives `S = MOI.LessThan{T}`
+  * `lb ≤ x₂ ≤ ub` gives `S = MOI.Interval{T}`
+  * `x₂` free gives `S = MOI.Zeros`
+
+The bridge also adds the appropriate bound on the activity variable `x₁`
+(for example, `x₁ ≥ 0` when `x₂` has a lower bound).
+
+## Source node
+
+`SpecifySetTypeBridge` supports:
+
+  * [`MOI.VectorOfVariables`](@ref) in [`MOI.Complements`](@ref)
+
+## Target nodes
+
+`SpecifySetTypeBridge` creates:
+
+  * [`MOI.VectorOfVariables`](@ref) in [`ComplementsWithSetType{S}`](@ref)
+  * [`MOI.VariableIndex`](@ref) in [`MOI.GreaterThan{T}`](@ref) or
+    [`MOI.LessThan{T}`](@ref) (bounds on `x₁`)
 
 """
 mutable struct SpecifySetTypeBridge{T} <: MOI.Bridges.Constraint.AbstractBridge

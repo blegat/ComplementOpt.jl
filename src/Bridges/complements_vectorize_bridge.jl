@@ -1,19 +1,32 @@
 """
     ComplementsVectorizeBridge{T,F,S,SV} <: MOI.Bridges.Constraint.AbstractBridge
 
-Bridge that shifts the slack variable in a complementarity pair to remove
-the bound constant, converting scalar-set-typed complements to vector-set-typed.
+`ComplementsVectorizeBridge` implements the following reformulations:
 
-For example, `VectorOfVariables([x1, x2])`-in-`ComplementsWithSetType{GreaterThan{T}}`
-becomes `VectorAffineFunction([x1, x2 - lb])`-in-`ComplementsWithSetType{Nonnegatives}`.
+  * `[x₁, x₂]` in `ComplementsWithSetType{GreaterThan{T}}` into
+    `[x₁, x₂ - lb]` in `ComplementsWithSetType{Nonnegatives}`
+  * `[x₁, x₂]` in `ComplementsWithSetType{LessThan{T}}` into
+    `[x₁, x₂ - ub]` in `ComplementsWithSetType{Nonpositives}`
+  * `[x₁, x₂]` in `ComplementsWithSetType{EqualTo{T}}` into
+    `[x₁, x₂ - c]` in `ComplementsWithSetType{Zeros}`
 
-Inspired by `MOI.Bridges.Constraint.VectorizeBridge`.
+where `T` is the coefficient type.
 
-The type parameters are:
-- `T`: coefficient type
-- `F`: output vector function type (determined by `promote_operation`)
-- `S`: input scalar set type (e.g., `GreaterThan{T}`)
-- `SV`: output vector set type (e.g., `Nonnegatives`)
+## Source node
+
+`ComplementsVectorizeBridge` supports:
+
+  * [`MOI.VectorOfVariables`](@ref) in [`ComplementsWithSetType{S}`](@ref)
+    where `S` is [`MOI.GreaterThan{T}`](@ref), [`MOI.LessThan{T}`](@ref), or
+    [`MOI.EqualTo{T}`](@ref)
+
+## Target nodes
+
+`ComplementsVectorizeBridge` creates:
+
+  * `F` in [`ComplementsWithSetType{SV}`](@ref), where `SV` is
+    [`MOI.Nonnegatives`](@ref), [`MOI.Nonpositives`](@ref), or
+    [`MOI.Zeros`](@ref) depending on the input set type
 
 """
 struct ComplementsVectorizeBridge{T,F,S,SV} <: MOI.Bridges.Constraint.AbstractBridge
