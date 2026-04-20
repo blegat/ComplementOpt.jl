@@ -43,14 +43,6 @@ function MOI.Bridges.added_constraint_types(::Type{<:NonlinearBridge})
     return Tuple{Type,Type}[]
 end
 
-function MOI.get(::NonlinearBridge, ::MOI.NumberOfVariables)::Int64
-    return 0
-end
-
-function MOI.get(::NonlinearBridge, ::MOI.ListOfVariableIndices)
-    return MOI.VariableIndex[]
-end
-
 function MOI.get(bridge::NonlinearBridge, ::MOI.NumberOfConstraints{F,S})::Int64 where {F,S}
     return count(ci -> ci isa MOI.ConstraintIndex{F,S}, bridge.constraints)
 end

@@ -33,14 +33,6 @@ function MOI.Bridges.added_constraint_types(::Type{VerticalBridge{S}}) where {S}
     return Tuple{Type,Type}[(MOI.VectorOfVariables, S)]
 end
 
-function MOI.get(::VerticalBridge, ::MOI.NumberOfVariables)::Int64
-    return 0
-end
-
-function MOI.get(::VerticalBridge, ::MOI.ListOfVariableIndices)
-    return MOI.VariableIndex[]
-end
-
 function MOI.get(
     ::VerticalBridge{S},
     ::MOI.NumberOfConstraints{MOI.VectorOfVariables,S},

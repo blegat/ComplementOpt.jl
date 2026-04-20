@@ -164,13 +164,6 @@ function MOI.Bridges.added_constraint_types(::Type{SpecifySetTypeBridge{T}}) whe
     ]
 end
 
-function MOI.get(::SpecifySetTypeBridge, ::MOI.NumberOfVariables)::Int64
-    return 0
-end
-
-function MOI.get(::SpecifySetTypeBridge, ::MOI.ListOfVariableIndices)
-    return MOI.VariableIndex[]
-end
 
 function MOI.get(
     bridge::SpecifySetTypeBridge,

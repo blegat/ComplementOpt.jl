@@ -119,14 +119,6 @@ function MOI.Bridges.added_constraint_types(
     return Tuple{Type,Type}[(F, ComplementsWithSetType{SV})]
 end
 
-function MOI.get(::ComplementsVectorizeBridge, ::MOI.NumberOfVariables)::Int64
-    return 0
-end
-
-function MOI.get(::ComplementsVectorizeBridge, ::MOI.ListOfVariableIndices)
-    return MOI.VariableIndex[]
-end
-
 function MOI.get(
     ::ComplementsVectorizeBridge{T,F,S,SV},
     ::MOI.NumberOfConstraints{F,ComplementsWithSetType{SV}},
