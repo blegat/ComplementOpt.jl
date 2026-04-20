@@ -16,10 +16,7 @@ The type parameters are:
 
 """
 struct ComplementsVectorizeBridge{T,S,SV} <: MOI.Bridges.Constraint.AbstractBridge
-    constraint::MOI.ConstraintIndex{
-        MOI.VectorAffineFunction{T},
-        ComplementsWithSetType{SV},
-    }
+    constraint::MOI.ConstraintIndex{MOI.VectorAffineFunction{T},ComplementsWithSetType{SV}}
     set_constant::T
 end
 
@@ -121,9 +118,7 @@ end
 function MOI.Bridges.added_constraint_types(
     ::Type{ComplementsVectorizeBridge{T,S,SV}},
 ) where {T,S,SV}
-    return Tuple{Type,Type}[
-        (MOI.VectorAffineFunction{T}, ComplementsWithSetType{SV}),
-    ]
+    return Tuple{Type,Type}[(MOI.VectorAffineFunction{T}, ComplementsWithSetType{SV}),]
 end
 
 function MOI.get(::ComplementsVectorizeBridge, ::MOI.NumberOfVariables)::Int64
@@ -143,10 +138,7 @@ end
 
 function MOI.get(
     bridge::ComplementsVectorizeBridge{T,S,SV},
-    ::MOI.ListOfConstraintIndices{
-        MOI.VectorAffineFunction{T},
-        ComplementsWithSetType{SV},
-    },
+    ::MOI.ListOfConstraintIndices{MOI.VectorAffineFunction{T},ComplementsWithSetType{SV}},
 ) where {T,S,SV}
     return [bridge.constraint]
 end
