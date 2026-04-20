@@ -17,6 +17,21 @@ end
 
 MOI.Bridges.Constraint.bridges(model::Optimizer) = model.constraint_map
 
+"""
+    _inner_supports_nlp(model::Optimizer)
+
+Check whether the inner solver supports nonlinear constraints
+(`ScalarNonlinearFunction`-in-`LessThan{Float64}`). If true, the nonlinear
+relaxation path is used. Otherwise, the SOS1 path is used.
+"""
+function _inner_supports_nlp(model::Optimizer)
+    return MOI.supports_constraint(
+        model.model,
+        MOI.ScalarNonlinearFunction,
+        MOI.LessThan{Float64},
+    )
+end
+
 # No variable bridge
 MOI.Bridges.is_bridged(::Optimizer, ::Type{<:MOI.AbstractSet}) = false
 
@@ -67,7 +82,7 @@ MOI.Bridges.bridge_type(
     ::Type{MOI.Complements},
 ) = Bridges.SpecifySetTypeBridge{Float64}
 
-# ComplementsWithSetType{S} → Bridges.NonlinearBridge{S} for all S
+# ComplementsWithSetType{S} → bridge selection depends on inner solver
 MOI.Bridges.is_bridged(
     ::Optimizer,
     ::Type{<:MOI.AbstractVectorFunction},
@@ -79,20 +94,69 @@ MOI.Bridges.supports_bridging_constraint(
     ::Type{<:ComplementsWithSetType},
 ) = true
 
+# --- NLP path: inner solver supports ScalarNonlinearFunction ---
+# NonlinearBridge handles all set types directly via relaxation methods.
+
+# --- SOS1 path: inner solver does NOT support ScalarNonlinearFunction ---
+# The chain is:
+#   ComplementsWithSetType{Interval} → SplitIntervalBridge → {GreaterThan, LessThan}
+#   ComplementsWithSetType{LessThan/Nonpositives} → FlipSignBridge → {GreaterThan/Nonnegatives}
+#   ComplementsWithSetType{GreaterThan} → ComplementsVectorizeBridge → VAF-in-{Nonnegatives}
+#   VAF-in-ComplementsWithSetType{Nonnegatives} → VerticalBridge → VOV-in-{Nonnegatives}
+#   VOV-in-ComplementsWithSetType{Nonnegatives} → ToSOS1Bridge → SOS1
+
 function MOI.Bridges.bridge_type(
-    ::Optimizer,
+    b::Optimizer,
     ::Type{<:MOI.VectorOfVariables},
     ::Type{ComplementsWithSetType{S}},
 ) where {S}
-    return Bridges.NonlinearBridge{S}
+    if _inner_supports_nlp(b)
+        return Bridges.NonlinearBridge{S}
+    end
+    return _sos1_bridge_type(MOI.VectorOfVariables, S)
 end
 
 function MOI.Bridges.bridge_type(
-    ::Optimizer,
-    ::Type{<:MOI.AbstractVectorFunction},
+    b::Optimizer,
+    F::Type{<:MOI.AbstractVectorFunction},
     ::Type{ComplementsWithSetType{S}},
 ) where {S}
-    return Bridges.NonlinearBridge{S}
+    if _inner_supports_nlp(b)
+        return Bridges.NonlinearBridge{S}
+    end
+    return _sos1_bridge_type(F, S)
+end
+
+# Dispatch to the appropriate bridge for the SOS1 path.
+# The goal is to reach VOV-in-ComplementsWithSetType{Nonnegatives} → ToSOS1Bridge.
+
+# Interval → SplitInterval (split into GreaterThan + LessThan)
+_sos1_bridge_type(::Type{MOI.VectorOfVariables}, ::Type{<:MOI.Interval}) =
+    Bridges.SplitIntervalBridge{Float64}
+
+# LessThan/Nonpositives → FlipSign (negate activity to get GreaterThan/Nonnegatives)
+_sos1_bridge_type(
+    ::Type{MOI.VectorOfVariables},
+    ::Type{<:Union{MOI.LessThan,MOI.Nonpositives}},
+) = Bridges.FlipSignBridge{Float64}
+
+# VOV-in-GreaterThan/EqualTo → Vectorize (shift to Nonneg/Zeros)
+_sos1_bridge_type(
+    ::Type{MOI.VectorOfVariables},
+    ::Type{<:Union{MOI.GreaterThan,MOI.EqualTo}},
+) = Bridges.ComplementsVectorizeBridge{Float64}
+
+# VOV-in-Nonnegatives ��� ToSOS1Bridge (final target)
+_sos1_bridge_type(::Type{MOI.VectorOfVariables}, ::Type{MOI.Nonnegatives}) =
+    Bridges.ToSOS1Bridge{Float64}
+
+# VOV-in-Zeros → ToSOS1Bridge (trivial complementarity)
+_sos1_bridge_type(::Type{MOI.VectorOfVariables}, ::Type{MOI.Zeros}) =
+    Bridges.ToSOS1Bridge{Float64}
+
+# Any non-VOV function → VerticalBridge (create slacks, then re-enter as VOV)
+function _sos1_bridge_type(::Type{F}, ::Type{S}) where {F<:MOI.AbstractVectorFunction,S}
+    return Bridges.VerticalBridge{ComplementsWithSetType{S}}
 end
 
 function MOI.Bridges.bridging_cost(b::Optimizer, args...)

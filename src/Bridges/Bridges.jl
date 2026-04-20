@@ -14,6 +14,7 @@ include("complements_vectorize_bridge.jl")
 include("split_interval_bridge.jl")
 include("flip_sign_bridge.jl")
 include("nonlinear.jl")
+include("to_sos1_bridge.jl")
 include("sos1.jl")
 
 end # module Bridges
