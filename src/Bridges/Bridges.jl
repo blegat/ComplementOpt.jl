@@ -12,6 +12,7 @@ include("vertical.jl")
 include("specify_set_type_bridge.jl")
 include("complements_vectorize_bridge.jl")
 include("split_interval_bridge.jl")
+include("flip_sign_bridge.jl")
 include("nonlinear.jl")
 include("sos1.jl")
 
