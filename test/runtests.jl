@@ -437,7 +437,7 @@ end
         @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) == 0
     end
 
-    @testset "Range case (x1 bounded nonneg → reduces to lower bound)" begin
+    @testset "Range case (x1 bounded nonneg)" begin
         model = Model()
         @variable(model, 0.0 <= x <= 10.0)
         @variable(model, 0.0 <= y <= 10.0)
@@ -445,7 +445,7 @@ end
         inner = MOI.Utilities.Model{Float64}()
         set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
         MOI.Utilities.attach_optimizer(model)
-        S = ComplementOpt.ComplementsWithSetType{MOI.Nonnegatives}
+        S = ComplementOpt.ComplementsWithSetType{MOI.Interval{Float64}}
         @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) == 0
     end
 end

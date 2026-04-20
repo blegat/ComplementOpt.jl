@@ -108,12 +108,6 @@ function _specify_upper_bound!(model, ::Type{T}, x1, x2, ub2) where {T}
 end
 
 function _specify_range!(model, ::Type{T}, x1, x2, lb2, ub2) where {T}
-    lb1, ub1 = MOIU.get_bounds(model, T, x1)
-    if !isinf(lb1) && lb1 >= 0
-        return _specify_lower_bound!(model, T, x1, x2, lb2)
-    elseif !isinf(ub1) && ub1 <= 0
-        return _specify_upper_bound!(model, T, x1, x2, ub2)
-    end
     return MOI.add_constraint(
         model,
         MOI.VectorOfVariables([x1, x2]),

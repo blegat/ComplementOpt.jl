@@ -167,8 +167,6 @@ function _relax_complementarity_range!(
     lb2,
     ub2,
 )
-    lb1, ub1 = MOIU.get_bounds(model, Float64, x1)
-    @assert isinf(lb1) && isinf(ub1)
     idc1 = MOI.add_constraint(model, x1 * (x2 - lb2), MOI.LessThan(relaxation.tau))
     idc2 = MOI.add_constraint(model, x1 * (x2 - ub2), MOI.LessThan(relaxation.tau))
     return [idc1, idc2]
