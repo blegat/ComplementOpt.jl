@@ -129,13 +129,13 @@ end
 
 # Bridge metadata
 
-function MOI.Bridges.added_constrained_variable_types(::Type{<:SplitIntervalBridge{T}}) where {T}
+function MOI.Bridges.added_constrained_variable_types(
+    ::Type{<:SplitIntervalBridge{T}},
+) where {T}
     return Tuple{Type}[(MOI.GreaterThan{T},), (MOI.LessThan{T},)]
 end
 
-function MOI.Bridges.added_constraint_types(
-    ::Type{<:SplitIntervalBridge{T,G}},
-) where {T,G}
+function MOI.Bridges.added_constraint_types(::Type{<:SplitIntervalBridge{T,G}}) where {T,G}
     return Tuple{Type,Type}[
         (MOI.VectorOfVariables, ComplementsWithSetType{MOI.GreaterThan{T}}),
         (MOI.VectorOfVariables, ComplementsWithSetType{MOI.LessThan{T}}),
@@ -236,19 +236,11 @@ function MOI.get(
     return [bridge.equality]
 end
 
-function MOI.get(
-    ::MOI.ModelLike,
-    ::MOI.ConstraintFunction,
-    bridge::SplitIntervalBridge,
-)
+function MOI.get(::MOI.ModelLike, ::MOI.ConstraintFunction, bridge::SplitIntervalBridge)
     return bridge.func
 end
 
-function MOI.get(
-    ::MOI.ModelLike,
-    ::MOI.ConstraintSet,
-    bridge::SplitIntervalBridge,
-)
+function MOI.get(::MOI.ModelLike, ::MOI.ConstraintSet, bridge::SplitIntervalBridge)
     return bridge.set
 end
 
