@@ -508,4 +508,35 @@ end
     @test JuMP.is_solved_and_feasible(model)
 end
 
+@testset "Bridge chain: SpecifySetType → SplitInterval → FlipSign → ToSOS1" begin
+    # HiGHS does not support ScalarNonlinearFunction, so the Optimizer
+    # uses the SOS1 path instead of NonlinearBridge.
+    opt = ComplementOpt.Optimizer(
+        MOI.Bridges.full_bridge_optimizer(HiGHS.Optimizer(), Float64),
+    )
+
+    # Create a model with an Interval complementarity constraint
+    x = MOI.add_variable(opt)
+    y, _ = MOI.add_constrained_variable(opt, MOI.Interval(0.0, 1.0))
+    ci = MOI.add_constraint(opt, MOI.VectorOfVariables([x, y]), MOI.Complements(2))
+    MOI.Bridges.final_touch(opt)
+
+    # Step 1: Complements → SpecifySetTypeBridge
+    bridge1 = MOI.Bridges.bridge(opt, ci)
+    @test bridge1 isa ComplementOpt.Bridges.SpecifySetTypeBridge
+    ci_interval = bridge1.constraints[1]
+    @test ci_interval isa MOI.ConstraintIndex{
+        MOI.VectorOfVariables,
+        ComplementOpt.ComplementsWithSetType{MOI.Interval{Float64}},
+    }
+
+    # Step 2: Interval → SplitIntervalBridge (not NonlinearBridge!)
+    bridge2 = MOI.Bridges.bridge(opt, ci_interval)
+    @test bridge2 isa ComplementOpt.Bridges.SplitIntervalBridge
+
+    # Step 3: LessThan part → FlipSignBridge
+    bridge3 = MOI.Bridges.bridge(opt, bridge2.upper)
+    @test bridge3 isa ComplementOpt.Bridges.FlipSignBridge
+end
+
 include(joinpath(@__DIR__, "Bridges", "runtests.jl"))
