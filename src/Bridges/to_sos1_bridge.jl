@@ -56,16 +56,6 @@ end
 
 MOI.supports(::MOI.ModelLike, ::ComplementarityReformulation, ::Type{<:ToSOS1Bridge}) = true
 
-function MOI.set(
-    ::MOI.ModelLike,
-    ::ComplementarityReformulation,
-    ::ToSOS1Bridge,
-    ::AbstractComplementarityRelaxation,
-)
-    # ToSOS1Bridge ignores the relaxation — it always uses SOS1.
-    return
-end
-
 # Bridge metadata
 
 function MOI.Bridges.added_constrained_variable_types(::Type{<:ToSOS1Bridge})
