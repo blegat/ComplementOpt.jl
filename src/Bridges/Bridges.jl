@@ -1,6 +1,6 @@
 module Bridges
 
-using JuMP
+import MathOptInterface as MOI
 const MOIU = MOI.Utilities
 using ..ComplementOpt:
     ComplementsWithSetType,
