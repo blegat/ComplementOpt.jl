@@ -1,6 +1,6 @@
 module ComplementOpt
 
-using JuMP
+import MathOptInterface as MOI
 const MOIU = MOI.Utilities
 
 include("utils.jl")
