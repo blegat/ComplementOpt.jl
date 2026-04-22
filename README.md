@@ -27,7 +27,7 @@ Solving the problem with Ipopt and ComplementOpt just amounts to either do:
 using Ipopt
 using ComplementOpt
 
-ComplementOpt.add_all_bridges(model)
+ComplementOpt.Bridges.add_all_bridges(model)
 set_optimizer(model, Ipopt.Optimizer)
 ```
 or
@@ -59,11 +59,11 @@ MOI.set(model, ComplementOpt.DefaultComplementarityReformulation(), ComplementOp
 
 > [!note]
 > The `ComplementOpt.DefaultComplementarityReformulation` attribute only works if you used
-> `set_optimizer(model, () -> ComplementOpt.Optimizer(...))`, not `ComplementOpt.add_all_bridges(model)`.
+> `set_optimizer(model, () -> ComplementOpt.Optimizer(...))`, not `ComplementOpt.Bridges.add_all_bridges(model)`.
 > That is the only difference between the two though so if you are not using setting
 > `ComplementOpt.DefaultComplementarityReformulation` because you don't change the default reformulation
 > or because you set it constraint-wise with the constraint attribute `ComplementOpt.ComplementarityReformulation`
-> then `ComplementOpt.add_all_bridges(model)` will work.
+> then `ComplementOpt.Bridges.add_all_bridges(model)` will work.
 
 ComplementOpt supports the following reformulations:
 - `ComplementOpt.ScholtesRelaxation(tau)` (**default**): reformulates the complementarity `0 ≤ a ⟂ b ≥ 0` as `0 ≤ (a, b)` and `a b ≤ tau`. For `tau = 0`, the reformulation is exact and leads to the formulation of a degenerate nonlinear program. The higher the parameter `tau`, the better the behavior in Ipopt.

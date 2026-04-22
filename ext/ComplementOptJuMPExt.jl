@@ -4,7 +4,7 @@ import ComplementOpt
 import JuMP
 import MathOptInterface as MOI
 
-function ComplementOpt.add_all_bridges(
+function ComplementOpt.Bridges.add_all_bridges(
     model::JuMP.GenericModel{T},
     ::Type{U} = T,
 ) where {T,U}

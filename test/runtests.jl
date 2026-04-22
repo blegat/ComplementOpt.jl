@@ -172,7 +172,7 @@ const OPTIMIZER_FACTORIES = [
         "LazyBridgeOptimizer + add_all_bridges",
         inner -> begin
             lazy = MOI.Bridges.full_bridge_optimizer(inner, Float64)
-            ComplementOpt.add_all_bridges(lazy)
+            ComplementOpt.Bridges.add_all_bridges(lazy)
             return lazy
         end,
     ),
