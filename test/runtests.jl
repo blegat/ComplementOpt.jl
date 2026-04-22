@@ -163,9 +163,24 @@ end
 expected_models =
     Dict(Instances.fletcher_leyffer_ex1_model => fletcher_leyffer_ex1_nonlinear_model)
 
-function test_model(model_func)
+# The tests that do not set `DefaultComplementarityReformulation` should work
+# both with `ComplementOpt.Optimizer` and with a `MOI.Bridges.LazyBridgeOptimizer`
+# in which all `ComplementOpt` bridges have been registered via `add_all_bridges`.
+const OPTIMIZER_FACTORIES = [
+    ("ComplementOpt.Optimizer", inner -> ComplementOpt.Optimizer(inner)),
+    (
+        "LazyBridgeOptimizer + add_all_bridges",
+        inner -> begin
+            lazy = MOI.Bridges.full_bridge_optimizer(inner, Float64)
+            ComplementOpt.add_all_bridges(lazy)
+            return lazy
+        end,
+    ),
+]
+
+function test_model(model_func, make_opt)
     model = model_func()
-    set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
+    set_optimizer(model, () -> make_opt(Ipopt.Optimizer()))
     JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
     JuMP.set_optimizer_attribute(model, "mu_strategy", "adaptive")
     JuMP.set_optimizer_attribute(model, "bound_push", 1e-1)
@@ -178,22 +193,27 @@ function test_model(model_func)
     end
 end
 
-function test_nonlinear_expr(original_model, reformulated_model)
+function test_nonlinear_expr(original_model, reformulated_model, make_opt)
     model = original_model()
     inner = MOI.Utilities.Model{Float64}()
-    set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
+    set_optimizer(model, () -> make_opt(inner))
     MOI.Utilities.attach_optimizer(model)
     expected = reformulated_model()
-    MOI.Bridges._test_structural_identical(unsafe_backend(model).model, backend(expected))
+    MOI.Bridges._test_structural_identical(
+        unsafe_backend(model) isa MOI.Bridges.AbstractBridgeOptimizer ?
+            unsafe_backend(model).model : unsafe_backend(model),
+        backend(expected),
+    )
 end
 
-@testset "Test vertical formulation" begin
+@testset "Test vertical formulation ($(opt_name))" for (opt_name, make_opt) in
+                                                        OPTIMIZER_FACTORIES
     model = test_vertical_formulation()
-    set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
+    set_optimizer(model, () -> make_opt(Ipopt.Optimizer()))
     MOI.Utilities.attach_optimizer(model)
 
     model = test_vertical_mispecified_2()
-    set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
+    set_optimizer(model, () -> make_opt(Ipopt.Optimizer()))
     @test_throws Exception MOI.Utilities.attach_optimizer(model)
 end
 

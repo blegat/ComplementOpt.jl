@@ -73,7 +73,7 @@ MOI.Bridges.bridge_type(
     ::Optimizer,
     ::Type{<:MOI.AbstractVectorFunction},
     ::Type{MOI.Complements},
-) = Bridges.VerticalBridge{MOI.Complements}
+) = Bridges.VerticalBridge{MOI.Complements,Float64}
 
 # VectorOfVariables-in-Complements → Bridges.SpecifySetTypeBridge{Float64}
 MOI.Bridges.bridge_type(
@@ -111,7 +111,7 @@ function MOI.Bridges.bridge_type(
     ::Type{ComplementsWithSetType{S}},
 ) where {S}
     if _inner_supports_nlp(b)
-        return Bridges.NonlinearBridge{S}
+        return Bridges.NonlinearBridge{Float64,S}
     end
     return _sos1_bridge_type(MOI.VectorOfVariables, S)
 end
@@ -122,7 +122,7 @@ function MOI.Bridges.bridge_type(
     ::Type{ComplementsWithSetType{S}},
 ) where {S}
     if _inner_supports_nlp(b)
-        return Bridges.NonlinearBridge{S}
+        return Bridges.NonlinearBridge{Float64,S}
     end
     return _sos1_bridge_type(F, S)
 end
@@ -156,7 +156,7 @@ _sos1_bridge_type(::Type{MOI.VectorOfVariables}, ::Type{MOI.Zeros}) =
 
 # Any non-VOV function → VerticalBridge (create slacks, then re-enter as VOV)
 function _sos1_bridge_type(::Type{F}, ::Type{S}) where {F<:MOI.AbstractVectorFunction,S}
-    return Bridges.VerticalBridge{ComplementsWithSetType{S}}
+    return Bridges.VerticalBridge{ComplementsWithSetType{S},Float64}
 end
 
 function MOI.Bridges.bridging_cost(b::Optimizer, args...)

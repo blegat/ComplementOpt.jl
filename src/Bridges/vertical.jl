@@ -1,5 +1,5 @@
 """
-    VerticalBridge{S} <: MOI.Bridges.Constraint.AbstractBridge
+    VerticalBridge{S,T} <: MOI.Bridges.Constraint.AbstractBridge
 
 `VerticalBridge` implements the following reformulation:
 
@@ -10,6 +10,12 @@ form by introducing slack variables. If the left-hand side is an expression,
 a slack variable `x₁` is created with an equality `lhs = x₁`. If the
 right-hand side variable `x₂` is unbounded, the left-hand side is converted
 to an equality constraint instead.
+
+The type parameter `S` is either [`MOI.Complements`](@ref) or a subtype of
+[`ComplementsWithSetType`](@ref), and `T` is the coefficient type. Writing
+the bridge as `VerticalBridge{S,T}` makes `(VerticalBridge{S}){T}` a valid
+bridge type, which lets the bridge be registered with
+[`MOI.Bridges.LazyBridgeOptimizer`](@ref) via [`JuMP.add_bridge`](@ref).
 
 ## Source node
 
@@ -23,32 +29,66 @@ to an equality constraint instead.
 `VerticalBridge` creates:
 
   * [`MOI.VectorOfVariables`](@ref) in `S`
-  * [`MOI.ScalarAffineFunction{Float64}`](@ref) in [`MOI.EqualTo{Float64}`](@ref)
+  * [`MOI.ScalarAffineFunction{T}`](@ref) in [`MOI.EqualTo{T}`](@ref)
 
 """
-struct VerticalBridge{S<:MOI.AbstractVectorSet} <: MOI.Bridges.Constraint.AbstractBridge
+struct VerticalBridge{S<:MOI.AbstractVectorSet,T} <: MOI.Bridges.Constraint.AbstractBridge
     constraint::MOI.ConstraintIndex{MOI.VectorOfVariables,S}
     equalities::Vector{MOI.ConstraintIndex}
 end
 
 function MOI.Bridges.Constraint.bridge_constraint(
-    ::Type{VerticalBridge{MOI.Complements}},
+    ::Type{VerticalBridge{MOI.Complements,T}},
     model::MOI.ModelLike,
     func::MOI.AbstractVectorFunction,
     set::MOI.Complements,
-)
-    return VerticalBridge{MOI.Complements}(reformulate_to_vertical!(model, func, set)...)
+) where {T}
+    return VerticalBridge{MOI.Complements,T}(
+        reformulate_to_vertical!(model, T, func, set)...,
+    )
 end
 
 function MOI.Bridges.Constraint.bridge_constraint(
-    ::Type{VerticalBridge{ComplementsWithSetType{S}}},
+    ::Type{VerticalBridge{ComplementsWithSetType{S},T}},
     model::MOI.ModelLike,
     func::MOI.AbstractVectorFunction,
     set::ComplementsWithSetType{S},
-) where {S}
-    return VerticalBridge{ComplementsWithSetType{S}}(
-        reformulate_to_vertical!(model, func, set)...,
+) where {S,T}
+    return VerticalBridge{ComplementsWithSetType{S},T}(
+        reformulate_to_vertical!(model, T, func, set)...,
     )
+end
+
+function MOI.supports_constraint(
+    ::Type{<:VerticalBridge},
+    ::Type{<:MOI.AbstractVectorFunction},
+    ::Type{MOI.Complements},
+)
+    return true
+end
+
+function MOI.supports_constraint(
+    ::Type{<:VerticalBridge},
+    ::Type{<:MOI.AbstractVectorFunction},
+    ::Type{<:ComplementsWithSetType},
+)
+    return true
+end
+
+function MOI.Bridges.Constraint.concrete_bridge_type(
+    ::Type{<:VerticalBridge{<:Any,T}},
+    ::Type{<:MOI.AbstractVectorFunction},
+    ::Type{MOI.Complements},
+) where {T}
+    return VerticalBridge{MOI.Complements,T}
+end
+
+function MOI.Bridges.Constraint.concrete_bridge_type(
+    ::Type{<:VerticalBridge{<:Any,T}},
+    ::Type{<:MOI.AbstractVectorFunction},
+    ::Type{ComplementsWithSetType{S}},
+) where {T,S}
+    return VerticalBridge{ComplementsWithSetType{S},T}
 end
 
 # Bridge metadata
@@ -57,7 +97,7 @@ function MOI.Bridges.added_constrained_variable_types(::Type{<:VerticalBridge})
     return Tuple{Type}[]
 end
 
-function MOI.Bridges.added_constraint_types(::Type{VerticalBridge{S}}) where {S}
+function MOI.Bridges.added_constraint_types(::Type{VerticalBridge{S,T}}) where {S,T}
     return Tuple{Type,Type}[(MOI.VectorOfVariables, S)]
 end
 
@@ -161,16 +201,17 @@ function _parse_complementarity_constraint(fun::MOI.AbstractVectorFunction, n_co
 end
 
 """
-    reformulate_to_vertical!(model::MOI.ModelLike, fun, set)
+    reformulate_to_vertical!(model::MOI.ModelLike, ::Type{T}, fun, set)
 
 Factorize all the complementarity constraints in `model` and formulate
 an equivalent model in vertical form. The complementarity constraints involving
-expressions are rewritten with a slack.
+expressions are rewritten with a slack. `T` is the coefficient type used for
+the generated equality constraints.
 
 Once reformulated, the complementarity constraints involve only single variables.
 
 """
-function reformulate_to_vertical!(model::MOI.ModelLike, fun, set)
+function reformulate_to_vertical!(model::MOI.ModelLike, ::Type{T}, fun, set) where {T}
     equalities = MOI.ConstraintIndex[]
     ind_cc1, ind_cc2 = MOI.VariableIndex[], MOI.VariableIndex[]
     n_comp = div(set.dimension, 2)
@@ -180,10 +221,10 @@ function reformulate_to_vertical!(model::MOI.ModelLike, fun, set)
     for (lhs, x2) in zip(cc_lhs, cc_rhs)
         if set isa MOI.Complements
             # Check if x2 is bounded.
-            lb, ub = MOIU.get_bounds(model, Float64, x2)
+            lb, ub = MOIU.get_bounds(model, T, x2)
             if isinf(lb) && isinf(ub)
                 # If x2 is unbounded, the LHS is directly converted to an equality constraint.
-                push!(equalities, MOI.add_constraint(model, lhs, MOI.EqualTo{Float64}(0)))
+                push!(equalities, MOI.add_constraint(model, lhs, MOI.EqualTo{T}(zero(T))))
                 continue
             end
         end
@@ -196,8 +237,8 @@ function reformulate_to_vertical!(model::MOI.ModelLike, fun, set)
         else
             # Else, reformulate LHS using vertical form
             x1 = MOI.add_variable(model)
-            new_lhs = MOIU.operate!(-, Float64, lhs, x1)
-            push!(equalities, MOI.add_constraint(model, new_lhs, MOI.EqualTo{Float64}(0)))
+            new_lhs = MOIU.operate!(-, T, lhs, x1)
+            push!(equalities, MOI.add_constraint(model, new_lhs, MOI.EqualTo{T}(zero(T))))
             push!(ind_cc1, x1)
             push!(ind_cc2, x2)
         end
