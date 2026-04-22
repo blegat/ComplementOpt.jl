@@ -133,8 +133,11 @@ end
 # The goal is to reach VOV-in-ComplementsWithSetType{Nonnegatives} → ToSOS1Bridge.
 
 # Interval → SplitInterval (split into GreaterThan + LessThan)
-_sos1_bridge_type(::Type{T}, ::Type{MOI.VectorOfVariables}, ::Type{<:MOI.Interval}) where {T} =
-    Bridges.SplitIntervalBridge{T}
+_sos1_bridge_type(
+    ::Type{T},
+    ::Type{MOI.VectorOfVariables},
+    ::Type{<:MOI.Interval},
+) where {T} = Bridges.SplitIntervalBridge{T}
 
 # LessThan/Nonpositives → FlipSign (negate activity to get GreaterThan/Nonnegatives)
 _sos1_bridge_type(
@@ -151,8 +154,11 @@ _sos1_bridge_type(
 ) where {T} = Bridges.ComplementsVectorizeBridge{T}
 
 # VOV-in-Nonnegatives → ToSOS1Bridge (final target)
-_sos1_bridge_type(::Type{T}, ::Type{MOI.VectorOfVariables}, ::Type{MOI.Nonnegatives}) where {T} =
-    Bridges.ToSOS1Bridge{T}
+_sos1_bridge_type(
+    ::Type{T},
+    ::Type{MOI.VectorOfVariables},
+    ::Type{MOI.Nonnegatives},
+) where {T} = Bridges.ToSOS1Bridge{T}
 
 # VOV-in-Zeros → ToSOS1Bridge (trivial complementarity)
 _sos1_bridge_type(::Type{T}, ::Type{MOI.VectorOfVariables}, ::Type{MOI.Zeros}) where {T} =
