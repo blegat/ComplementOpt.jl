@@ -15,11 +15,6 @@ The relaxation method is determined by the
   * `S <: MOI.Interval`: range relaxation
   * `S == MOI.Zeros`: equality (trivial complementarity)
 
-The type parameter `T` is the coefficient type. It is listed first so that
-`NonlinearBridge{T}` is a valid bridge type that can be registered with a
-[`MOI.Bridges.LazyBridgeOptimizer`](@ref), with `S` resolved by
-[`MOI.Bridges.Constraint.concrete_bridge_type`](@ref).
-
 ## Source node
 
 `NonlinearBridge` supports:

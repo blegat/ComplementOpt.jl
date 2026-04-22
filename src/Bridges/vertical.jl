@@ -11,12 +11,6 @@ a slack variable `x₁` is created with an equality `lhs = x₁`. If the
 right-hand side variable `x₂` is unbounded, the left-hand side is converted
 to an equality constraint instead.
 
-`T` is the coefficient type and `S` is either [`MOI.Complements`](@ref) or a
-subtype of [`ComplementsWithSetType`](@ref). Since `T` comes first,
-`VerticalBridge{T}` is a valid (not-fully-specified) bridge type that can be
-registered with a [`MOI.Bridges.LazyBridgeOptimizer`](@ref); `S` is then
-resolved by [`MOI.Bridges.Constraint.concrete_bridge_type`](@ref).
-
 ## Source node
 
 `VerticalBridge` supports:
