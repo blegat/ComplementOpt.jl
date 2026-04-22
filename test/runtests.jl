@@ -203,7 +203,8 @@ function test_nonlinear_expr(original_model, reformulated_model)
 end
 
 @testset "Test vertical formulation ($(opt_name))" for (opt_name, make_opt) in
-                                                        OPTIMIZER_FACTORIES
+                                                       OPTIMIZER_FACTORIES
+
     model = test_vertical_formulation()
     set_optimizer(model, () -> make_opt(Ipopt.Optimizer()))
     MOI.Utilities.attach_optimizer(model)
@@ -403,7 +404,8 @@ end
 end
 
 @testset "SpecifySetTypeBridge ($(opt_name))" for (opt_name, make_opt) in
-                                                   OPTIMIZER_FACTORIES
+                                                  OPTIMIZER_FACTORIES
+
     @testset "Lower bound (Nonnegatives)" begin
         model = Model()
         @variable(model, x)
