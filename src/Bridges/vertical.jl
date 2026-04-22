@@ -1,5 +1,5 @@
 """
-    VerticalBridge{S,T} <: MOI.Bridges.Constraint.AbstractBridge
+    VerticalBridge{T,S} <: MOI.Bridges.Constraint.AbstractBridge
 
 `VerticalBridge` implements the following reformulation:
 
@@ -11,11 +11,11 @@ a slack variable `x₁` is created with an equality `lhs = x₁`. If the
 right-hand side variable `x₂` is unbounded, the left-hand side is converted
 to an equality constraint instead.
 
-The type parameter `S` is either [`MOI.Complements`](@ref) or a subtype of
-[`ComplementsWithSetType`](@ref), and `T` is the coefficient type. Writing
-the bridge as `VerticalBridge{S,T}` makes `(VerticalBridge{S}){T}` a valid
-bridge type, which lets the bridge be registered with
-[`MOI.Bridges.LazyBridgeOptimizer`](@ref) via [`JuMP.add_bridge`](@ref).
+`T` is the coefficient type and `S` is either [`MOI.Complements`](@ref) or a
+subtype of [`ComplementsWithSetType`](@ref). Since `T` comes first,
+`VerticalBridge{T}` is a valid (not-fully-specified) bridge type that can be
+registered with a [`MOI.Bridges.LazyBridgeOptimizer`](@ref); `S` is then
+resolved by [`MOI.Bridges.Constraint.concrete_bridge_type`](@ref).
 
 ## Source node
 
@@ -32,29 +32,29 @@ bridge type, which lets the bridge be registered with
   * [`MOI.ScalarAffineFunction{T}`](@ref) in [`MOI.EqualTo{T}`](@ref)
 
 """
-struct VerticalBridge{S<:MOI.AbstractVectorSet,T} <: MOI.Bridges.Constraint.AbstractBridge
+struct VerticalBridge{T,S<:MOI.AbstractVectorSet} <: MOI.Bridges.Constraint.AbstractBridge
     constraint::MOI.ConstraintIndex{MOI.VectorOfVariables,S}
     equalities::Vector{MOI.ConstraintIndex}
 end
 
 function MOI.Bridges.Constraint.bridge_constraint(
-    ::Type{VerticalBridge{MOI.Complements,T}},
+    ::Type{VerticalBridge{T,MOI.Complements}},
     model::MOI.ModelLike,
     func::MOI.AbstractVectorFunction,
     set::MOI.Complements,
 ) where {T}
-    return VerticalBridge{MOI.Complements,T}(
+    return VerticalBridge{T,MOI.Complements}(
         reformulate_to_vertical!(model, T, func, set)...,
     )
 end
 
 function MOI.Bridges.Constraint.bridge_constraint(
-    ::Type{VerticalBridge{ComplementsWithSetType{S},T}},
+    ::Type{VerticalBridge{T,ComplementsWithSetType{S}}},
     model::MOI.ModelLike,
     func::MOI.AbstractVectorFunction,
     set::ComplementsWithSetType{S},
-) where {S,T}
-    return VerticalBridge{ComplementsWithSetType{S},T}(
+) where {T,S}
+    return VerticalBridge{T,ComplementsWithSetType{S}}(
         reformulate_to_vertical!(model, T, func, set)...,
     )
 end
@@ -76,19 +76,19 @@ function MOI.supports_constraint(
 end
 
 function MOI.Bridges.Constraint.concrete_bridge_type(
-    ::Type{<:VerticalBridge{<:Any,T}},
+    ::Type{<:VerticalBridge{T}},
     ::Type{<:MOI.AbstractVectorFunction},
     ::Type{MOI.Complements},
 ) where {T}
-    return VerticalBridge{MOI.Complements,T}
+    return VerticalBridge{T,MOI.Complements}
 end
 
 function MOI.Bridges.Constraint.concrete_bridge_type(
-    ::Type{<:VerticalBridge{<:Any,T}},
+    ::Type{<:VerticalBridge{T}},
     ::Type{<:MOI.AbstractVectorFunction},
     ::Type{ComplementsWithSetType{S}},
 ) where {T,S}
-    return VerticalBridge{ComplementsWithSetType{S},T}
+    return VerticalBridge{T,ComplementsWithSetType{S}}
 end
 
 # Bridge metadata
@@ -97,21 +97,21 @@ function MOI.Bridges.added_constrained_variable_types(::Type{<:VerticalBridge})
     return Tuple{Type}[]
 end
 
-function MOI.Bridges.added_constraint_types(::Type{VerticalBridge{S,T}}) where {S,T}
+function MOI.Bridges.added_constraint_types(::Type{VerticalBridge{T,S}}) where {T,S}
     return Tuple{Type,Type}[(MOI.VectorOfVariables, S)]
 end
 
 function MOI.get(
-    ::VerticalBridge{S},
+    ::VerticalBridge{T,S},
     ::MOI.NumberOfConstraints{MOI.VectorOfVariables,S},
-)::Int64 where {S}
+)::Int64 where {T,S}
     return 1
 end
 
 function MOI.get(
-    bridge::VerticalBridge{S},
+    bridge::VerticalBridge{T,S},
     ::MOI.ListOfConstraintIndices{MOI.VectorOfVariables,S},
-) where {S}
+) where {T,S}
     return [bridge.constraint]
 end
 

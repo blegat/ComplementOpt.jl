@@ -193,17 +193,13 @@ function test_model(model_func, make_opt)
     end
 end
 
-function test_nonlinear_expr(original_model, reformulated_model, make_opt)
+function test_nonlinear_expr(original_model, reformulated_model)
     model = original_model()
     inner = MOI.Utilities.Model{Float64}()
-    set_optimizer(model, () -> make_opt(inner))
+    set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
     MOI.Utilities.attach_optimizer(model)
     expected = reformulated_model()
-    MOI.Bridges._test_structural_identical(
-        unsafe_backend(model) isa MOI.Bridges.AbstractBridgeOptimizer ?
-            unsafe_backend(model).model : unsafe_backend(model),
-        backend(expected),
-    )
+    MOI.Bridges._test_structural_identical(unsafe_backend(model).model, backend(expected))
 end
 
 @testset "Test vertical formulation ($(opt_name))" for (opt_name, make_opt) in
@@ -231,8 +227,10 @@ instances = filter(names(Instances; all = true)) do name
     endswith(s, "_model") && !startswith(s, "#")
 end
 
-@testset "$name" for name in instances
-    test_model(getfield(Instances, name))
+@testset "$(opt_name): $name" for (opt_name, make_opt) in OPTIMIZER_FACTORIES,
+    name in instances
+
+    test_model(getfield(Instances, name), make_opt)
 end
 
 @testset "Test reformulation for $original_model" for (
@@ -404,14 +402,15 @@ end
     @test isnothing(MOI.get(model, ComplementOpt.ComplementarityReformulation(), c2))
 end
 
-@testset "SpecifySetTypeBridge" begin
+@testset "SpecifySetTypeBridge ($(opt_name))" for (opt_name, make_opt) in
+                                                   OPTIMIZER_FACTORIES
     @testset "Lower bound (Nonnegatives)" begin
         model = Model()
         @variable(model, x)
         @variable(model, 0.0 <= y)
         @constraint(model, [x, y] ∈ MOI.Complements(2))
         inner = MOI.Utilities.Model{Float64}()
-        set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
+        set_optimizer(model, () -> make_opt(inner))
         MOI.Utilities.attach_optimizer(model)
         # ComplementsWithSetType is bridged further to nonlinear constraints
         S = ComplementOpt.ComplementsWithSetType{MOI.Nonnegatives}
@@ -424,7 +423,7 @@ end
         @variable(model, 3.0 <= y)
         @constraint(model, [x, y] ∈ MOI.Complements(2))
         inner = MOI.Utilities.Model{Float64}()
-        set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
+        set_optimizer(model, () -> make_opt(inner))
         MOI.Utilities.attach_optimizer(model)
         S = ComplementOpt.ComplementsWithSetType{MOI.GreaterThan{Float64}}
         @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) == 0
@@ -436,7 +435,7 @@ end
         @variable(model, y <= 1.0)
         @constraint(model, [x, y] ∈ MOI.Complements(2))
         inner = MOI.Utilities.Model{Float64}()
-        set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
+        set_optimizer(model, () -> make_opt(inner))
         MOI.Utilities.attach_optimizer(model)
         S = ComplementOpt.ComplementsWithSetType{MOI.LessThan{Float64}}
         @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) == 0
@@ -448,7 +447,7 @@ end
         @variable(model, 0.0 <= y <= 1.0)
         @constraint(model, [x, y] ∈ MOI.Complements(2))
         inner = MOI.Utilities.Model{Float64}()
-        set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
+        set_optimizer(model, () -> make_opt(inner))
         MOI.Utilities.attach_optimizer(model)
         S = ComplementOpt.ComplementsWithSetType{MOI.Interval{Float64}}
         @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) == 0
@@ -460,7 +459,7 @@ end
         @variable(model, 0.0 <= y <= 10.0)
         @constraint(model, [x, y] ∈ MOI.Complements(2))
         inner = MOI.Utilities.Model{Float64}()
-        set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
+        set_optimizer(model, () -> make_opt(inner))
         MOI.Utilities.attach_optimizer(model)
         S = ComplementOpt.ComplementsWithSetType{MOI.Interval{Float64}}
         @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) == 0

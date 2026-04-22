@@ -73,7 +73,7 @@ MOI.Bridges.bridge_type(
     ::Optimizer,
     ::Type{<:MOI.AbstractVectorFunction},
     ::Type{MOI.Complements},
-) = Bridges.VerticalBridge{MOI.Complements,Float64}
+) = Bridges.VerticalBridge{Float64,MOI.Complements}
 
 # VectorOfVariables-in-Complements → Bridges.SpecifySetTypeBridge{Float64}
 MOI.Bridges.bridge_type(
@@ -156,7 +156,7 @@ _sos1_bridge_type(::Type{MOI.VectorOfVariables}, ::Type{MOI.Zeros}) =
 
 # Any non-VOV function → VerticalBridge (create slacks, then re-enter as VOV)
 function _sos1_bridge_type(::Type{F}, ::Type{S}) where {F<:MOI.AbstractVectorFunction,S}
-    return Bridges.VerticalBridge{ComplementsWithSetType{S},Float64}
+    return Bridges.VerticalBridge{Float64,ComplementsWithSetType{S}}
 end
 
 function MOI.Bridges.bridging_cost(b::Optimizer, args...)
