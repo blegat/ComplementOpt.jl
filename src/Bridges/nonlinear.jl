@@ -1,5 +1,5 @@
 """
-    NonlinearBridge{S} <: MOI.Bridges.Constraint.AbstractBridge
+    NonlinearBridge{T,S} <: MOI.Bridges.Constraint.AbstractBridge
 
 `NonlinearBridge` implements the following reformulation:
 
@@ -27,7 +27,7 @@ The relaxation method is determined by the
 method (for example, quadratic or `ScalarNonlinearFunction` constraints).
 
 """
-mutable struct NonlinearBridge{S} <: MOI.Bridges.Constraint.AbstractBridge
+mutable struct NonlinearBridge{T,S} <: MOI.Bridges.Constraint.AbstractBridge
     constraints::Vector
     func::MOI.VectorOfVariables
     set::ComplementsWithSetType{S}
@@ -35,18 +35,34 @@ mutable struct NonlinearBridge{S} <: MOI.Bridges.Constraint.AbstractBridge
 end
 
 function MOI.Bridges.Constraint.bridge_constraint(
-    ::Type{NonlinearBridge{S}},
+    ::Type{NonlinearBridge{T,S}},
     model::MOI.ModelLike,
     func::MOI.VectorOfVariables,
     set::ComplementsWithSetType{S},
     # Only `ComplementOpt.Optimizer` supports setting custom bridge arguments
     # so the default will be used when the bridge is added for instance to
     # `MOI.Bridges.LazyBridgeOptimizer`
-    reformulation::AbstractComplementarityRelaxation = ScholtesRelaxation(0.0),
-) where {S}
+    reformulation::AbstractComplementarityRelaxation = ScholtesRelaxation(zero(T)),
+) where {T,S}
     # Delay reformulation until `final_touch` so that per-constraint
     # `ComplementarityReformulation` attributes can override it first.
-    return NonlinearBridge{S}([], func, set, reformulation)
+    return NonlinearBridge{T,S}([], func, set, reformulation)
+end
+
+function MOI.supports_constraint(
+    ::Type{<:NonlinearBridge},
+    ::Type{MOI.VectorOfVariables},
+    ::Type{<:ComplementsWithSetType},
+)
+    return true
+end
+
+function MOI.Bridges.Constraint.concrete_bridge_type(
+    ::Type{<:NonlinearBridge{T}},
+    ::Type{MOI.VectorOfVariables},
+    ::Type{ComplementsWithSetType{S}},
+) where {T,S}
+    return NonlinearBridge{T,S}
 end
 
 MOI.supports(::MOI.ModelLike, ::ComplementarityReformulation, ::Type{<:NonlinearBridge}) =

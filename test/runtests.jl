@@ -163,9 +163,28 @@ end
 expected_models =
     Dict(Instances.fletcher_leyffer_ex1_model => fletcher_leyffer_ex1_nonlinear_model)
 
-function test_model(model_func)
+# The tests that do not set `DefaultComplementarityReformulation` should work
+# both with `ComplementOpt.Optimizer` and with a `MOI.Bridges.LazyBridgeOptimizer`
+# in which all `ComplementOpt` bridges have been registered via `add_all_bridges`.
+const OPTIMIZER_FACTORIES = [
+    ("ComplementOpt.Optimizer", inner -> ComplementOpt.Optimizer(inner)),
+    (
+        "LazyBridgeOptimizer + add_all_bridges",
+        inner -> begin
+            lazy = MOI.Bridges.full_bridge_optimizer(inner, Float64)
+            ComplementOpt.Bridges.add_all_bridges(lazy)
+            return lazy
+        end,
+    ),
+]
+
+# Some instances are flaky in CI around the reference optimum, so we loosen
+# the tolerance on a per-instance basis.
+const MACMPEC_TOLERANCES = Dict(:water_net_model => (rtol = 1e-2, atol = 1e-2))
+
+function test_model(model_func, make_opt)
     model = model_func()
-    set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
+    set_optimizer(model, () -> make_opt(Ipopt.Optimizer()))
     JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
     JuMP.set_optimizer_attribute(model, "mu_strategy", "adaptive")
     JuMP.set_optimizer_attribute(model, "bound_push", 1e-1)
@@ -174,7 +193,8 @@ function test_model(model_func)
     name = Symbol(model_func)
     @test JuMP.is_solved_and_feasible(model)
     if haskey(Instances.MACMPEC_SOLUTIONS, name)
-        @test JuMP.objective_value(model) ≈ Instances.MACMPEC_SOLUTIONS[name] rtol=1e-4 atol=1e-4
+        tol = get(MACMPEC_TOLERANCES, name, (rtol = 1e-4, atol = 1e-4))
+        @test JuMP.objective_value(model) ≈ Instances.MACMPEC_SOLUTIONS[name] rtol=tol.rtol atol=tol.atol
     end
 end
 
@@ -187,13 +207,15 @@ function test_nonlinear_expr(original_model, reformulated_model)
     MOI.Bridges._test_structural_identical(unsafe_backend(model).model, backend(expected))
 end
 
-@testset "Test vertical formulation" begin
+@testset "Test vertical formulation ($(opt_name))" for (opt_name, make_opt) in
+                                                       OPTIMIZER_FACTORIES
+
     model = test_vertical_formulation()
-    set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
+    set_optimizer(model, () -> make_opt(Ipopt.Optimizer()))
     MOI.Utilities.attach_optimizer(model)
 
     model = test_vertical_mispecified_2()
-    set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
+    set_optimizer(model, () -> make_opt(Ipopt.Optimizer()))
     @test_throws Exception MOI.Utilities.attach_optimizer(model)
 end
 
@@ -211,8 +233,10 @@ instances = filter(names(Instances; all = true)) do name
     endswith(s, "_model") && !startswith(s, "#")
 end
 
-@testset "$name" for name in instances
-    test_model(getfield(Instances, name))
+@testset "$(opt_name): $name" for (opt_name, make_opt) in OPTIMIZER_FACTORIES,
+    name in instances
+
+    test_model(getfield(Instances, name), make_opt)
 end
 
 @testset "Test reformulation for $original_model" for (
@@ -384,14 +408,16 @@ end
     @test isnothing(MOI.get(model, ComplementOpt.ComplementarityReformulation(), c2))
 end
 
-@testset "SpecifySetTypeBridge" begin
+@testset "SpecifySetTypeBridge ($(opt_name))" for (opt_name, make_opt) in
+                                                  OPTIMIZER_FACTORIES
+
     @testset "Lower bound (Nonnegatives)" begin
         model = Model()
         @variable(model, x)
         @variable(model, 0.0 <= y)
         @constraint(model, [x, y] ∈ MOI.Complements(2))
         inner = MOI.Utilities.Model{Float64}()
-        set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
+        set_optimizer(model, () -> make_opt(inner))
         MOI.Utilities.attach_optimizer(model)
         # ComplementsWithSetType is bridged further to nonlinear constraints
         S = ComplementOpt.ComplementsWithSetType{MOI.Nonnegatives}
@@ -404,7 +430,7 @@ end
         @variable(model, 3.0 <= y)
         @constraint(model, [x, y] ∈ MOI.Complements(2))
         inner = MOI.Utilities.Model{Float64}()
-        set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
+        set_optimizer(model, () -> make_opt(inner))
         MOI.Utilities.attach_optimizer(model)
         S = ComplementOpt.ComplementsWithSetType{MOI.GreaterThan{Float64}}
         @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) == 0
@@ -416,7 +442,7 @@ end
         @variable(model, y <= 1.0)
         @constraint(model, [x, y] ∈ MOI.Complements(2))
         inner = MOI.Utilities.Model{Float64}()
-        set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
+        set_optimizer(model, () -> make_opt(inner))
         MOI.Utilities.attach_optimizer(model)
         S = ComplementOpt.ComplementsWithSetType{MOI.LessThan{Float64}}
         @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) == 0
@@ -428,7 +454,7 @@ end
         @variable(model, 0.0 <= y <= 1.0)
         @constraint(model, [x, y] ∈ MOI.Complements(2))
         inner = MOI.Utilities.Model{Float64}()
-        set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
+        set_optimizer(model, () -> make_opt(inner))
         MOI.Utilities.attach_optimizer(model)
         S = ComplementOpt.ComplementsWithSetType{MOI.Interval{Float64}}
         @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) == 0
@@ -440,7 +466,7 @@ end
         @variable(model, 0.0 <= y <= 10.0)
         @constraint(model, [x, y] ∈ MOI.Complements(2))
         inner = MOI.Utilities.Model{Float64}()
-        set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
+        set_optimizer(model, () -> make_opt(inner))
         MOI.Utilities.attach_optimizer(model)
         S = ComplementOpt.ComplementsWithSetType{MOI.Interval{Float64}}
         @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) == 0
