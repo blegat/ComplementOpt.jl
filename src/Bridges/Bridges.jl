@@ -2,7 +2,7 @@ module Bridges
 
 import MathOptInterface as MOI
 const MOIU = MOI.Utilities
-using ..ComplementOpt:
+using ..MathOptComplements:
     ComplementsWithSetType,
     AbstractComplementarityRelaxation,
     ComplementarityReformulation,
@@ -19,16 +19,16 @@ include("to_sos1_bridge.jl")
 """
     add_all_bridges(model::MOI.ModelLike, ::Type{T} = Float64)
 
-Add all `ComplementOpt` bridges to `model`. The model is typically a
+Add all `MathOptComplements` bridges to `model`. The model is typically a
 [`MOI.Bridges.LazyBridgeOptimizer`](@ref) so that the bridge graph is
 extended with the bridges needed to reformulate
-[`ComplementOpt.ComplementsWithSetType`](@ref) and [`MOI.Complements`](@ref)
+[`MathOptComplements.ComplementsWithSetType`](@ref) and [`MOI.Complements`](@ref)
 constraints.
 
 When used with a `LazyBridgeOptimizer`, the [`NonlinearBridge`](@ref) uses
 the default [`ScholtesRelaxation`](@ref) because the
-[`ComplementOpt.DefaultComplementarityReformulation`](@ref) optimizer
-attribute is only supported by [`ComplementOpt.Optimizer`](@ref).
+[`MathOptComplements.DefaultComplementarityReformulation`](@ref) optimizer
+attribute is only supported by [`MathOptComplements.Optimizer`](@ref).
 """
 function add_all_bridges(model::MOI.ModelLike, ::Type{T} = Float64) where {T}
     MOI.Bridges.add_bridge(model, SpecifySetTypeBridge{T})

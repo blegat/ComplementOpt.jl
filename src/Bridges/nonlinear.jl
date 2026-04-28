@@ -39,7 +39,7 @@ function MOI.Bridges.Constraint.bridge_constraint(
     model::MOI.ModelLike,
     func::MOI.VectorOfVariables,
     set::ComplementsWithSetType{S},
-    # Only `ComplementOpt.Optimizer` supports setting custom bridge arguments
+    # Only `MathOptComplements.Optimizer` supports setting custom bridge arguments
     # so the default will be used when the bridge is added for instance to
     # `MOI.Bridges.LazyBridgeOptimizer`
     reformulation::AbstractComplementarityRelaxation = ScholtesRelaxation(zero(T)),

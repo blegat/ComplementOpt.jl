@@ -18,7 +18,7 @@ reformulation set via [`ComplementarityReformulation`](@ref).
 ## Example
 
 ```julia
-MOI.set(model, ComplementOpt.DefaultComplementarityReformulation(), ComplementOpt.ScholtesRelaxation(0.0))
+MOI.set(model, MathOptComplements.DefaultComplementarityReformulation(), MathOptComplements.ScholtesRelaxation(0.0))
 ```
 """
 struct DefaultComplementarityReformulation <: MOI.AbstractOptimizerAttribute end
@@ -36,9 +36,9 @@ model-wide default.
 ## Example
 
 ```julia
-MOI.set(model, ComplementOpt.DefaultComplementarityReformulation(), ComplementOpt.ScholtesRelaxation(0.0))
+MOI.set(model, MathOptComplements.DefaultComplementarityReformulation(), MathOptComplements.ScholtesRelaxation(0.0))
 c = @constraint(model, x ⟂ y)
-MOI.set(model, ComplementOpt.ComplementarityReformulation(), c, ComplementOpt.FischerBurmeisterRelaxation(1e-8))
+MOI.set(model, MathOptComplements.ComplementarityReformulation(), c, MathOptComplements.FischerBurmeisterRelaxation(1e-8))
 ```
 """
 struct ComplementarityReformulation <: MOI.AbstractConstraintAttribute end
