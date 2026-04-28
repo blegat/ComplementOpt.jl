@@ -19,11 +19,7 @@ using ComplementOpt
                 x1, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
                 x2, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
                 # x1 * (x2 - 0) <= 0
-                MOI.add_constraint(
-                    model,
-                    x1 * (x2 - 0.0),
-                    MOI.LessThan(0.0),
-                )
+                MOI.add_constraint(model, x1 * (x2 - 0.0), MOI.LessThan(0.0))
             end;
             cannot_unbridge = true,
         )
@@ -45,11 +41,7 @@ using ComplementOpt
                 x1, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
                 x2, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
                 # x1 * (x2 - 0) <= 0
-                MOI.add_constraint(
-                    model,
-                    x1 * (x2 - 0.0),
-                    MOI.LessThan(0.0),
-                )
+                MOI.add_constraint(model, x1 * (x2 - 0.0), MOI.LessThan(0.0))
             end;
             cannot_unbridge = true,
         )
@@ -71,11 +63,7 @@ using ComplementOpt
                 x1, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
                 x2, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(3.0))
                 # x1 * (x2 - 3) <= 0
-                MOI.add_constraint(
-                    model,
-                    x1 * (x2 - 3.0),
-                    MOI.LessThan(0.0),
-                )
+                MOI.add_constraint(model, x1 * (x2 - 3.0), MOI.LessThan(0.0))
             end;
             cannot_unbridge = true,
         )
@@ -97,11 +85,7 @@ using ComplementOpt
                 x1, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
                 x2, _ = MOI.add_constrained_variable(model, MOI.LessThan(-2.0))
                 # x1 * (x2 - (-2)) <= 0
-                MOI.add_constraint(
-                    model,
-                    x1 * (x2 + 2.0),
-                    MOI.LessThan(0.0),
-                )
+                MOI.add_constraint(model, x1 * (x2 + 2.0), MOI.LessThan(0.0))
             end;
             cannot_unbridge = true,
         )
