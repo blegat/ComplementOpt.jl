@@ -73,7 +73,9 @@ using MathOptComplements
         inner = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
         model = MOI.Bridges.Constraint.SingleBridgeOptimizer{
             MathOptComplements.Bridges.NonlinearBridge{Float64},
-        }(inner)
+        }(
+            inner,
+        )
         x1 = MOI.add_variable(model)
         x2, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
         MOI.add_constraint(
@@ -93,7 +95,9 @@ using MathOptComplements
         inner = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
         model = MOI.Bridges.Constraint.SingleBridgeOptimizer{
             MathOptComplements.Bridges.NonlinearBridge{Float64},
-        }(inner)
+        }(
+            inner,
+        )
         x1 = MOI.add_variable(model)
         x2, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
         MOI.add_constraint(
@@ -135,7 +139,9 @@ using MathOptComplements
         inner = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
         model = MOI.Bridges.Constraint.SingleBridgeOptimizer{
             MathOptComplements.Bridges.NonlinearBridge{Float64},
-        }(inner)
+        }(
+            inner,
+        )
         x1 = MOI.add_variable(model)
         x2, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
         ci = MOI.add_constraint(
@@ -146,15 +152,23 @@ using MathOptComplements
         relax = MathOptComplements.FischerBurmeisterRelaxation(1e-8)
         MOI.set(model, MathOptComplements.ComplementarityReformulation(), ci, relax)
         MOI.Bridges.final_touch(model)
-        @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VariableIndex,MOI.GreaterThan{Float64}}()) == 2
-        @test MOI.get(inner, MOI.NumberOfConstraints{MOI.ScalarNonlinearFunction,MOI.LessThan{Float64}}()) == 1
+        @test MOI.get(
+            inner,
+            MOI.NumberOfConstraints{MOI.VariableIndex,MOI.GreaterThan{Float64}}(),
+        ) == 2
+        @test MOI.get(
+            inner,
+            MOI.NumberOfConstraints{MOI.ScalarNonlinearFunction,MOI.LessThan{Float64}}(),
+        ) == 1
     end
 
     @testset "FB: Nonpositives with unbounded x1" begin
         inner = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
         model = MOI.Bridges.Constraint.SingleBridgeOptimizer{
             MathOptComplements.Bridges.NonlinearBridge{Float64},
-        }(inner)
+        }(
+            inner,
+        )
         x1 = MOI.add_variable(model)
         x2, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
         ci = MOI.add_constraint(
@@ -165,15 +179,23 @@ using MathOptComplements
         relax = MathOptComplements.FischerBurmeisterRelaxation(1e-8)
         MOI.set(model, MathOptComplements.ComplementarityReformulation(), ci, relax)
         MOI.Bridges.final_touch(model)
-        @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VariableIndex,MOI.LessThan{Float64}}()) == 2
-        @test MOI.get(inner, MOI.NumberOfConstraints{MOI.ScalarNonlinearFunction,MOI.GreaterThan{Float64}}()) == 1
+        @test MOI.get(
+            inner,
+            MOI.NumberOfConstraints{MOI.VariableIndex,MOI.LessThan{Float64}}(),
+        ) == 2
+        @test MOI.get(
+            inner,
+            MOI.NumberOfConstraints{MOI.ScalarNonlinearFunction,MOI.GreaterThan{Float64}}(),
+        ) == 1
     end
 
     @testset "KS: Nonnegatives with unbounded x1" begin
         inner = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
         model = MOI.Bridges.Constraint.SingleBridgeOptimizer{
             MathOptComplements.Bridges.NonlinearBridge{Float64},
-        }(inner)
+        }(
+            inner,
+        )
         x1 = MOI.add_variable(model)
         x2, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
         ci = MOI.add_constraint(
@@ -184,14 +206,19 @@ using MathOptComplements
         relax = MathOptComplements.KanzowSchwarzRelaxation(1e-8)
         MOI.set(model, MathOptComplements.ComplementarityReformulation(), ci, relax)
         MOI.Bridges.final_touch(model)
-        @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VariableIndex,MOI.GreaterThan{Float64}}()) == 2
+        @test MOI.get(
+            inner,
+            MOI.NumberOfConstraints{MOI.VariableIndex,MOI.GreaterThan{Float64}}(),
+        ) == 2
     end
 
     @testset "KS: Nonpositives with unbounded x1" begin
         inner = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
         model = MOI.Bridges.Constraint.SingleBridgeOptimizer{
             MathOptComplements.Bridges.NonlinearBridge{Float64},
-        }(inner)
+        }(
+            inner,
+        )
         x1 = MOI.add_variable(model)
         x2, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
         ci = MOI.add_constraint(
@@ -202,7 +229,10 @@ using MathOptComplements
         relax = MathOptComplements.KanzowSchwarzRelaxation(1e-8)
         MOI.set(model, MathOptComplements.ComplementarityReformulation(), ci, relax)
         MOI.Bridges.final_touch(model)
-        @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VariableIndex,MOI.LessThan{Float64}}()) == 2
+        @test MOI.get(
+            inner,
+            MOI.NumberOfConstraints{MOI.VariableIndex,MOI.LessThan{Float64}}(),
+        ) == 2
     end
 
     @testset "Zeros (equality)" begin
