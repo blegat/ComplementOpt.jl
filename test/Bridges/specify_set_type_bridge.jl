@@ -1,11 +1,11 @@
 using Test
 using JuMP
-using ComplementOpt
+using MathOptComplements
 
 @testset "SpecifySetTypeBridge" begin
     @testset "Lower bound (Nonnegatives)" begin
         MOI.Bridges.runtests(
-            ComplementOpt.Bridges.SpecifySetTypeBridge,
+            MathOptComplements.Bridges.SpecifySetTypeBridge,
             model -> begin
                 x, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
                 y, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
@@ -21,7 +21,7 @@ using ComplementOpt
                 MOI.add_constraint(
                     model,
                     MOI.VectorOfVariables([x, y]),
-                    ComplementOpt.ComplementsWithSetType{MOI.Nonnegatives}(2),
+                    MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}(2),
                 )
             end;
             cannot_unbridge = true,
@@ -30,7 +30,7 @@ using ComplementOpt
 
     @testset "Lower bound (GreaterThan)" begin
         MOI.Bridges.runtests(
-            ComplementOpt.Bridges.SpecifySetTypeBridge,
+            MathOptComplements.Bridges.SpecifySetTypeBridge,
             model -> begin
                 x = MOI.add_variable(model)
                 y, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(3.0))
@@ -46,7 +46,7 @@ using ComplementOpt
                 MOI.add_constraint(
                     model,
                     MOI.VectorOfVariables([x, y]),
-                    ComplementOpt.ComplementsWithSetType{MOI.GreaterThan{Float64}}(2),
+                    MathOptComplements.ComplementsWithSetType{MOI.GreaterThan{Float64}}(2),
                 )
             end;
             cannot_unbridge = true,
@@ -55,7 +55,7 @@ using ComplementOpt
 
     @testset "Upper bound (Nonpositives)" begin
         MOI.Bridges.runtests(
-            ComplementOpt.Bridges.SpecifySetTypeBridge,
+            MathOptComplements.Bridges.SpecifySetTypeBridge,
             model -> begin
                 x = MOI.add_variable(model)
                 y, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
@@ -71,7 +71,7 @@ using ComplementOpt
                 MOI.add_constraint(
                     model,
                     MOI.VectorOfVariables([x, y]),
-                    ComplementOpt.ComplementsWithSetType{MOI.Nonpositives}(2),
+                    MathOptComplements.ComplementsWithSetType{MOI.Nonpositives}(2),
                 )
             end;
             cannot_unbridge = true,
@@ -80,7 +80,7 @@ using ComplementOpt
 
     @testset "Upper bound (LessThan)" begin
         MOI.Bridges.runtests(
-            ComplementOpt.Bridges.SpecifySetTypeBridge,
+            MathOptComplements.Bridges.SpecifySetTypeBridge,
             model -> begin
                 x = MOI.add_variable(model)
                 y, _ = MOI.add_constrained_variable(model, MOI.LessThan(-2.0))
@@ -96,7 +96,7 @@ using ComplementOpt
                 MOI.add_constraint(
                     model,
                     MOI.VectorOfVariables([x, y]),
-                    ComplementOpt.ComplementsWithSetType{MOI.LessThan{Float64}}(2),
+                    MathOptComplements.ComplementsWithSetType{MOI.LessThan{Float64}}(2),
                 )
             end;
             cannot_unbridge = true,
@@ -105,7 +105,7 @@ using ComplementOpt
 
     @testset "Range (Interval)" begin
         MOI.Bridges.runtests(
-            ComplementOpt.Bridges.SpecifySetTypeBridge,
+            MathOptComplements.Bridges.SpecifySetTypeBridge,
             model -> begin
                 x = MOI.add_variable(model)
                 y, _ = MOI.add_constrained_variable(model, MOI.Interval(0.0, 1.0))
@@ -121,7 +121,7 @@ using ComplementOpt
                 MOI.add_constraint(
                     model,
                     MOI.VectorOfVariables([x, y]),
-                    ComplementOpt.ComplementsWithSetType{MOI.Interval{Float64}}(2),
+                    MathOptComplements.ComplementsWithSetType{MOI.Interval{Float64}}(2),
                 )
             end;
             cannot_unbridge = true,

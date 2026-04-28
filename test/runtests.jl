@@ -9,7 +9,7 @@ using JuMP
 using Ipopt
 using HiGHS
 
-using ComplementOpt
+using MathOptComplements
 
 function fletcher_leyffer_ex1_nonlinear_model()
     model = Model()
@@ -164,15 +164,15 @@ expected_models =
     Dict(Instances.fletcher_leyffer_ex1_model => fletcher_leyffer_ex1_nonlinear_model)
 
 # The tests that do not set `DefaultComplementarityReformulation` should work
-# both with `ComplementOpt.Optimizer` and with a `MOI.Bridges.LazyBridgeOptimizer`
-# in which all `ComplementOpt` bridges have been registered via `add_all_bridges`.
+# both with `MathOptComplements.Optimizer` and with a `MOI.Bridges.LazyBridgeOptimizer`
+# in which all `MathOptComplements` bridges have been registered via `add_all_bridges`.
 const OPTIMIZER_FACTORIES = [
-    ("ComplementOpt.Optimizer", inner -> ComplementOpt.Optimizer(inner)),
+    ("MathOptComplements.Optimizer", inner -> MathOptComplements.Optimizer(inner)),
     (
         "LazyBridgeOptimizer + add_all_bridges",
         inner -> begin
             lazy = MOI.Bridges.full_bridge_optimizer(inner, Float64)
-            ComplementOpt.Bridges.add_all_bridges(lazy)
+            MathOptComplements.Bridges.add_all_bridges(lazy)
             return lazy
         end,
     ),
@@ -201,7 +201,7 @@ end
 function test_nonlinear_expr(original_model, reformulated_model)
     model = original_model()
     inner = MOI.Utilities.Model{Float64}()
-    set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
+    set_optimizer(model, () -> MathOptComplements.Optimizer(inner))
     MOI.Utilities.attach_optimizer(model)
     expected = reformulated_model()
     MOI.Bridges._test_structural_identical(unsafe_backend(model).model, backend(expected))
@@ -242,29 +242,29 @@ end
 end
 
 @testset "Relaxation method: $(relax)" for relax in [
-    ComplementOpt.ScholtesRelaxation(0.0),
-    ComplementOpt.FischerBurmeisterRelaxation(1e-8),
-    ComplementOpt.LiuFukushimaRelaxation(1e-8),
-    ComplementOpt.KanzowSchwarzRelaxation(1e-8),
+    MathOptComplements.ScholtesRelaxation(0.0),
+    MathOptComplements.FischerBurmeisterRelaxation(1e-8),
+    MathOptComplements.LiuFukushimaRelaxation(1e-8),
+    MathOptComplements.KanzowSchwarzRelaxation(1e-8),
 ]
     @testset "Test reformulation" begin
         model = test_nonlinear_reformulation()
-        set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
-        MOI.set(model, ComplementOpt.DefaultComplementarityReformulation(), relax)
+        set_optimizer(model, () -> MathOptComplements.Optimizer(Ipopt.Optimizer()))
+        MOI.set(model, MathOptComplements.DefaultComplementarityReformulation(), relax)
         MOI.Utilities.attach_optimizer(model)
 
         for test_func in (test_nonlinear_mispecified_1, test_nonlinear_mispecified_2)
             model = test_func()
-            set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
-            MOI.set(model, ComplementOpt.DefaultComplementarityReformulation(), relax)
+            set_optimizer(model, () -> MathOptComplements.Optimizer(Ipopt.Optimizer()))
+            MOI.set(model, MathOptComplements.DefaultComplementarityReformulation(), relax)
             @test_throws Exception MOI.Utilities.attach_optimizer(model)
         end
     end
 
     @testset "Solve Fletcher-Leyffer Ex1 problem" begin
         model = Instances.fletcher_leyffer_ex1_model()
-        JuMP.set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
-        MOI.set(model, ComplementOpt.DefaultComplementarityReformulation(), relax)
+        JuMP.set_optimizer(model, () -> MathOptComplements.Optimizer(Ipopt.Optimizer()))
+        MOI.set(model, MathOptComplements.DefaultComplementarityReformulation(), relax)
         JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
         JuMP.set_silent(model)
         JuMP.optimize!(model)
@@ -276,8 +276,8 @@ end
 
     @testset "Solve NCP problem $(func)" for func in [simple_ncp, simple_lp_3]
         model, vars, sol = func()
-        JuMP.set_optimizer(model, () -> ComplementOpt.Optimizer(Ipopt.Optimizer()))
-        MOI.set(model, ComplementOpt.DefaultComplementarityReformulation(), relax)
+        JuMP.set_optimizer(model, () -> MathOptComplements.Optimizer(Ipopt.Optimizer()))
+        MOI.set(model, MathOptComplements.DefaultComplementarityReformulation(), relax)
         JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
         JuMP.set_silent(model)
         JuMP.optimize!(model)
@@ -290,25 +290,25 @@ end
 # N.B.: at the moment, mixed-complementarity problems are supported only
 # with ScholtesRelaxation and with FischerBurmeisterRelaxation
 @testset "Mixed-complementarity problem with $(relax)" for relax in [
-    ComplementOpt.ScholtesRelaxation(0.0),
-    ComplementOpt.FischerBurmeisterRelaxation(1e-8),
+    MathOptComplements.ScholtesRelaxation(0.0),
+    MathOptComplements.FischerBurmeisterRelaxation(1e-8),
 ]
     @testset "Solve NCP problem $(func)" for func in [simple_lp_1] #, simple_lp_2]
         model, vars, sol = func()
         JuMP.set_optimizer(
             model,
-            () -> ComplementOpt.Optimizer(
+            () -> MathOptComplements.Optimizer(
                 MOI.instantiate(Ipopt.Optimizer, with_cache_type = Float64),
             ),
         )
-        MOI.set(model, ComplementOpt.DefaultComplementarityReformulation(), relax)
+        MOI.set(model, MathOptComplements.DefaultComplementarityReformulation(), relax)
         JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
         JuMP.set_silent(model)
         JuMP.optimize!(model)
 
         inner = backend(model).optimizer.model.model
 
-        if relax isa ComplementOpt.ScholtesRelaxation
+        if relax isa MathOptComplements.ScholtesRelaxation
             F = MOI.ScalarQuadraticFunction{Float64}
             G = MOI.ScalarNonlinearFunction
         else
@@ -334,7 +334,7 @@ end
     @objective(model, Min, (x1 - 1)^2 + y1^2 + (x2 - 1)^2 + y2^2)
     JuMP.set_optimizer(
         model,
-        () -> ComplementOpt.Optimizer(
+        () -> MathOptComplements.Optimizer(
             MOI.instantiate(Ipopt.Optimizer, with_cache_type = Float64),
         ),
         with_cache_type = Float64,
@@ -342,47 +342,47 @@ end
     # Default is Scholtes
     MOI.set(
         model,
-        ComplementOpt.DefaultComplementarityReformulation(),
-        ComplementOpt.ScholtesRelaxation(0.0),
+        MathOptComplements.DefaultComplementarityReformulation(),
+        MathOptComplements.ScholtesRelaxation(0.0),
     )
     # Override c1 with FischerBurmeister
     MOI.set(
         model,
-        ComplementOpt.ComplementarityReformulation(),
+        MathOptComplements.ComplementarityReformulation(),
         c1,
-        ComplementOpt.FischerBurmeisterRelaxation(1e-8),
+        MathOptComplements.FischerBurmeisterRelaxation(1e-8),
     )
     @test MOI.supports(
         JuMP.unsafe_backend(model),
-        ComplementOpt.DefaultComplementarityReformulation(),
+        MathOptComplements.DefaultComplementarityReformulation(),
     )
     b = JuMP.unsafe_backend(model)
-    attr = ComplementOpt.ComplementarityReformulation()
+    attr = MathOptComplements.ComplementarityReformulation()
     F = MOI.VectorOfVariables
     S = MOI.Complements
     @test MOI.Bridges.is_bridged(b, S)
     @test MOI.supports_add_constrained_variables(b, S)
     @test !MOI.Bridges.is_variable_bridged(b, S)
     bridge_type = MOI.Bridges.Constraint.concrete_bridge_type(b, F, S)
-    @test bridge_type == ComplementOpt.Bridges.SpecifySetTypeBridge{Float64}
+    @test bridge_type == MathOptComplements.Bridges.SpecifySetTypeBridge{Float64}
     @test MOI.supports(b, attr, bridge_type)
     @test MOI.supports(
         JuMP.unsafe_backend(model),
-        ComplementOpt.ComplementarityReformulation(),
+        MathOptComplements.ComplementarityReformulation(),
         MOI.ConstraintIndex{MOI.VectorOfVariables,MOI.Complements},
     )
     @test MOI.supports(
         JuMP.unsafe_backend(model),
-        ComplementOpt.ComplementarityReformulation(),
+        MathOptComplements.ComplementarityReformulation(),
         MOI.ConstraintIndex{MOI.VectorOfVariables,MOI.Complements},
     )
     @test MOI.supports(
         JuMP.unsafe_backend(model),
-        ComplementOpt.ComplementarityReformulation(),
+        MathOptComplements.ComplementarityReformulation(),
         MOI.ConstraintIndex{MOI.VectorOfVariables,MOI.Complements},
     )
-    @test MOI.get(model, ComplementOpt.ComplementarityReformulation(), c1) isa
-          ComplementOpt.FischerBurmeisterRelaxation
+    @test MOI.get(model, MathOptComplements.ComplementarityReformulation(), c1) isa
+          MathOptComplements.FischerBurmeisterRelaxation
     JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
     JuMP.set_silent(model)
     JuMP.optimize!(model)
@@ -393,11 +393,11 @@ end
     ci_mapped = first(
         MOI.get(lazy, MOI.ListOfConstraintIndices{MOI.VectorOfVariables,MOI.Complements}()),
     )
-    @test MOI.get(lazy, ComplementOpt.ComplementarityReformulation(), ci_mapped) isa
-          ComplementOpt.FischerBurmeisterRelaxation
-    @test MOI.get(model, ComplementOpt.ComplementarityReformulation(), c1) isa
-          ComplementOpt.FischerBurmeisterRelaxation
-    @test isnothing(MOI.get(model, ComplementOpt.ComplementarityReformulation(), c2))
+    @test MOI.get(lazy, MathOptComplements.ComplementarityReformulation(), ci_mapped) isa
+          MathOptComplements.FischerBurmeisterRelaxation
+    @test MOI.get(model, MathOptComplements.ComplementarityReformulation(), c1) isa
+          MathOptComplements.FischerBurmeisterRelaxation
+    @test isnothing(MOI.get(model, MathOptComplements.ComplementarityReformulation(), c2))
 end
 
 @testset "SpecifySetTypeBridge ($(opt_name))" for (opt_name, make_opt) in
@@ -412,7 +412,7 @@ end
         set_optimizer(model, () -> make_opt(inner))
         MOI.Utilities.attach_optimizer(model)
         # ComplementsWithSetType is bridged further to nonlinear constraints
-        S = ComplementOpt.ComplementsWithSetType{MOI.Nonnegatives}
+        S = MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}
         @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) == 0
     end
 
@@ -424,7 +424,7 @@ end
         inner = MOI.Utilities.Model{Float64}()
         set_optimizer(model, () -> make_opt(inner))
         MOI.Utilities.attach_optimizer(model)
-        S = ComplementOpt.ComplementsWithSetType{MOI.GreaterThan{Float64}}
+        S = MathOptComplements.ComplementsWithSetType{MOI.GreaterThan{Float64}}
         @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) == 0
     end
 
@@ -436,7 +436,7 @@ end
         inner = MOI.Utilities.Model{Float64}()
         set_optimizer(model, () -> make_opt(inner))
         MOI.Utilities.attach_optimizer(model)
-        S = ComplementOpt.ComplementsWithSetType{MOI.LessThan{Float64}}
+        S = MathOptComplements.ComplementsWithSetType{MOI.LessThan{Float64}}
         @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) == 0
     end
 
@@ -448,7 +448,7 @@ end
         inner = MOI.Utilities.Model{Float64}()
         set_optimizer(model, () -> make_opt(inner))
         MOI.Utilities.attach_optimizer(model)
-        S = ComplementOpt.ComplementsWithSetType{MOI.Interval{Float64}}
+        S = MathOptComplements.ComplementsWithSetType{MOI.Interval{Float64}}
         @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) == 0
     end
 
@@ -460,7 +460,7 @@ end
         inner = MOI.Utilities.Model{Float64}()
         set_optimizer(model, () -> make_opt(inner))
         MOI.Utilities.attach_optimizer(model)
-        S = ComplementOpt.ComplementsWithSetType{MOI.Interval{Float64}}
+        S = MathOptComplements.ComplementsWithSetType{MOI.Interval{Float64}}
         @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) == 0
     end
 end
@@ -474,12 +474,12 @@ end
     @objective(model, Min, x^2 + y^2)
     JuMP.set_optimizer(
         model,
-        () -> ComplementOpt.Optimizer(
+        () -> MathOptComplements.Optimizer(
             MOI.instantiate(Ipopt.Optimizer, with_cache_type = Float64),
         ),
     )
-    attr = ComplementOpt.ComplementarityReformulation()
-    reformulation = ComplementOpt.FischerBurmeisterRelaxation(1e-8)
+    attr = MathOptComplements.ComplementarityReformulation()
+    reformulation = MathOptComplements.FischerBurmeisterRelaxation(1e-8)
     MOI.set(model, attr, c, reformulation)
     JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
     JuMP.set_silent(model)
@@ -492,7 +492,7 @@ end
 @testset "Bridge chain: SpecifySetType → SplitInterval → FlipSign → ToSOS1" begin
     # HiGHS does not support ScalarNonlinearFunction, so the Optimizer
     # uses the SOS1 path instead of NonlinearBridge.
-    opt = ComplementOpt.Optimizer(
+    opt = MathOptComplements.Optimizer(
         MOI.Bridges.full_bridge_optimizer(HiGHS.Optimizer(), Float64),
     )
 
@@ -504,20 +504,20 @@ end
 
     # Step 1: Complements → SpecifySetTypeBridge
     bridge1 = MOI.Bridges.bridge(opt, ci)
-    @test bridge1 isa ComplementOpt.Bridges.SpecifySetTypeBridge
+    @test bridge1 isa MathOptComplements.Bridges.SpecifySetTypeBridge
     ci_interval = bridge1.constraints[1]
     @test ci_interval isa MOI.ConstraintIndex{
         MOI.VectorOfVariables,
-        ComplementOpt.ComplementsWithSetType{MOI.Interval{Float64}},
+        MathOptComplements.ComplementsWithSetType{MOI.Interval{Float64}},
     }
 
     # Step 2: Interval → SplitIntervalBridge (not NonlinearBridge!)
     bridge2 = MOI.Bridges.bridge(opt, ci_interval)
-    @test bridge2 isa ComplementOpt.Bridges.SplitIntervalBridge
+    @test bridge2 isa MathOptComplements.Bridges.SplitIntervalBridge
 
     # Step 3: LessThan part → FlipSignBridge
     bridge3 = MOI.Bridges.bridge(opt, bridge2.upper)
-    @test bridge3 isa ComplementOpt.Bridges.FlipSignBridge
+    @test bridge3 isa MathOptComplements.Bridges.FlipSignBridge
 end
 
 include(joinpath(@__DIR__, "Bridges", "runtests.jl"))

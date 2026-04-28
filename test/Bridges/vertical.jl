@@ -1,11 +1,11 @@
 using Test
 using JuMP
-using ComplementOpt
+using MathOptComplements
 
 @testset "VerticalBridge" begin
     @testset "Unbounded RHS with constant in LHS (Complements)" begin
         MOI.Bridges.runtests(
-            ComplementOpt.Bridges.VerticalBridge,
+            MathOptComplements.Bridges.VerticalBridge,
             model -> begin
                 x = MOI.add_variable(model)
                 z = MOI.add_variable(model)
@@ -41,7 +41,7 @@ using ComplementOpt
 
     @testset "Expression LHS with constant (ComplementsWithSetType)" begin
         MOI.Bridges.runtests(
-            ComplementOpt.Bridges.VerticalBridge,
+            MathOptComplements.Bridges.VerticalBridge,
             model -> begin
                 x = MOI.add_variable(model)
                 y, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
@@ -55,7 +55,7 @@ using ComplementOpt
                 MOI.add_constraint(
                     model,
                     f,
-                    ComplementOpt.ComplementsWithSetType{MOI.Nonnegatives}(2),
+                    MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}(2),
                 )
             end,
             model -> begin
@@ -67,7 +67,7 @@ using ComplementOpt
                 MOI.add_constraint(
                     model,
                     MOI.VectorOfVariables([x1, y]),
-                    ComplementOpt.ComplementsWithSetType{MOI.Nonnegatives}(2),
+                    MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}(2),
                 )
             end;
             cannot_unbridge = true,

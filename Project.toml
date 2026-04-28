@@ -1,4 +1,4 @@
-name = "ComplementOpt"
+name = "MathOptComplements"
 uuid = "3144fb79-1414-4d28-b1d1-63dadd798e24"
 version = "0.1.0"
 
@@ -9,7 +9,7 @@ MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
 
 [extensions]
-ComplementOptJuMPExt = "JuMP"
+MathOptComplementsJuMPExt = "JuMP"
 
 [compat]
 JuMP = "1"

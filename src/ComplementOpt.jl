@@ -1,4 +1,4 @@
-module ComplementOpt
+module MathOptComplements
 
 import MathOptInterface as MOI
 const MOIU = MOI.Utilities
@@ -16,4 +16,4 @@ using .Bridges:
 
 include("MOI_wrapper.jl")
 
-end # module ComplementOpt
+end # module MathOptComplements

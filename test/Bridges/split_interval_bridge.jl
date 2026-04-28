@@ -1,18 +1,18 @@
 using Test
 using JuMP
-using ComplementOpt
+using MathOptComplements
 
 @testset "SplitIntervalBridge" begin
     @testset "VectorOfVariables input" begin
         MOI.Bridges.runtests(
-            ComplementOpt.Bridges.SplitIntervalBridge,
+            MathOptComplements.Bridges.SplitIntervalBridge,
             model -> begin
                 x = MOI.add_variable(model)
                 y, _ = MOI.add_constrained_variable(model, MOI.Interval(0.0, 1.0))
                 MOI.add_constraint(
                     model,
                     MOI.VectorOfVariables([x, y]),
-                    ComplementOpt.ComplementsWithSetType{MOI.Interval{Float64}}(2),
+                    MathOptComplements.ComplementsWithSetType{MOI.Interval{Float64}}(2),
                 )
             end,
             model -> begin
@@ -25,12 +25,12 @@ using ComplementOpt
                 MOI.add_constraint(
                     model,
                     MOI.VectorOfVariables([xp, y]),
-                    ComplementOpt.ComplementsWithSetType{MOI.GreaterThan{Float64}}(2),
+                    MathOptComplements.ComplementsWithSetType{MOI.GreaterThan{Float64}}(2),
                 )
                 MOI.add_constraint(
                     model,
                     MOI.VectorOfVariables([xn, y]),
-                    ComplementOpt.ComplementsWithSetType{MOI.LessThan{Float64}}(2),
+                    MathOptComplements.ComplementsWithSetType{MOI.LessThan{Float64}}(2),
                 )
             end;
             cannot_unbridge = true,
@@ -39,7 +39,7 @@ using ComplementOpt
 
     @testset "VectorAffineFunction input" begin
         MOI.Bridges.runtests(
-            ComplementOpt.Bridges.SplitIntervalBridge,
+            MathOptComplements.Bridges.SplitIntervalBridge,
             model -> begin
                 x = MOI.add_variable(model)
                 y, _ = MOI.add_constrained_variable(model, MOI.Interval(0.0, 1.0))
@@ -53,7 +53,7 @@ using ComplementOpt
                 MOI.add_constraint(
                     model,
                     f,
-                    ComplementOpt.ComplementsWithSetType{MOI.Interval{Float64}}(2),
+                    MathOptComplements.ComplementsWithSetType{MOI.Interval{Float64}}(2),
                 )
             end,
             model -> begin
@@ -66,12 +66,12 @@ using ComplementOpt
                 MOI.add_constraint(
                     model,
                     MOI.VectorOfVariables([xp, y]),
-                    ComplementOpt.ComplementsWithSetType{MOI.GreaterThan{Float64}}(2),
+                    MathOptComplements.ComplementsWithSetType{MOI.GreaterThan{Float64}}(2),
                 )
                 MOI.add_constraint(
                     model,
                     MOI.VectorOfVariables([xn, y]),
-                    ComplementOpt.ComplementsWithSetType{MOI.LessThan{Float64}}(2),
+                    MathOptComplements.ComplementsWithSetType{MOI.LessThan{Float64}}(2),
                 )
             end;
             cannot_unbridge = true,
