@@ -219,14 +219,6 @@ end
     @test_throws Exception MOI.Utilities.attach_optimizer(model)
 end
 
-@testset "Nonlinear reformulation with $(relax)" for relax in [
-    ComplementOpt.ScholtesRelaxation(0.0),
-    ComplementOpt.FischerBurmeisterRelaxation(1e-8),
-    ComplementOpt.LiuFukushimaRelaxation(1e-8),
-    ComplementOpt.KanzowSchwarzRelaxation(1e-8),
-]
-end
-
 instances = filter(names(Instances; all = true)) do name
     # The function types start with `#`
     s = String(name)
