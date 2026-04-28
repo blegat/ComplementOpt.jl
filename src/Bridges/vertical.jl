@@ -218,7 +218,7 @@ function reformulate_to_vertical!(model::MOI.ModelLike, ::Type{T}, fun, set) whe
             lb, ub = MOIU.get_bounds(model, T, x2)
             if isinf(lb) && isinf(ub)
                 # If x2 is unbounded, the LHS is directly converted to an equality constraint.
-                push!(equalities, MOI.add_constraint(model, lhs, MOI.EqualTo{T}(zero(T))))
+                push!(equalities, MOIU.normalize_and_add_constraint(model, lhs, MOI.EqualTo{T}(zero(T))))
                 continue
             end
         end
@@ -232,7 +232,7 @@ function reformulate_to_vertical!(model::MOI.ModelLike, ::Type{T}, fun, set) whe
             # Else, reformulate LHS using vertical form
             x1 = MOI.add_variable(model)
             new_lhs = MOIU.operate!(-, T, lhs, x1)
-            push!(equalities, MOI.add_constraint(model, new_lhs, MOI.EqualTo{T}(zero(T))))
+            push!(equalities, MOIU.normalize_and_add_constraint(model, new_lhs, MOI.EqualTo{T}(zero(T))))
             push!(ind_cc1, x1)
             push!(ind_cc2, x2)
         end
