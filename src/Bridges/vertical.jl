@@ -167,7 +167,6 @@ end
     Parser for JuMP problems with complementarity constraints.
 =#
 
-_is_single_variable(::MOI.AbstractScalarFunction) = false
 function _is_single_variable(func::MOI.ScalarAffineFunction)
     return length(func.terms) == 1 &&
            func.terms[1].coefficient == 1.0 &&
