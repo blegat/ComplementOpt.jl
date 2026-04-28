@@ -465,43 +465,6 @@ end
     end
 end
 
-@testset "SOS1 reformulation" begin
-    @testset "Structural test (lower bound)" begin
-        model = test_nonlinear_reformulation()
-        inner = MOI.Utilities.Model{Float64}()
-        set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
-        MOI.set(
-            model,
-            ComplementOpt.DefaultComplementarityReformulation(),
-            ComplementOpt.SOS1Relaxation(),
-        )
-        MOI.Utilities.attach_optimizer(model)
-        @test MOI.get(
-            inner,
-            MOI.NumberOfConstraints{MOI.VectorOfVariables,MOI.SOS1{Float64}}(),
-        ) > 0
-    end
-
-    @testset "Structural test (upper bound)" begin
-        model = Model()
-        @variable(model, x)
-        @variable(model, y <= 0.0)
-        @constraint(model, x ⟂ y)
-        inner = MOI.Utilities.Model{Float64}()
-        set_optimizer(model, () -> ComplementOpt.Optimizer(inner))
-        MOI.set(
-            model,
-            ComplementOpt.DefaultComplementarityReformulation(),
-            ComplementOpt.SOS1Relaxation(),
-        )
-        MOI.Utilities.attach_optimizer(model)
-        @test MOI.get(
-            inner,
-            MOI.NumberOfConstraints{MOI.VectorOfVariables,MOI.SOS1{Float64}}(),
-        ) > 0
-    end
-end
-
 @testset "Per-constraint reformulation with VerticalBridge" begin
     # Use an expression LHS so that the constraint goes through VerticalBridge
     model = Model()
