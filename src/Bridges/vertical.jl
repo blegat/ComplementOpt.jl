@@ -29,6 +29,7 @@ to an equality constraint instead.
 struct VerticalBridge{T,S<:MOI.AbstractVectorSet} <: MOI.Bridges.Constraint.AbstractBridge
     constraint::MOI.ConstraintIndex{MOI.VectorOfVariables,S}
     equalities::Vector{MOI.ConstraintIndex}
+    slacks::Vector{MOI.VariableIndex}
 end
 
 function MOI.Bridges.Constraint.bridge_constraint(
@@ -37,9 +38,8 @@ function MOI.Bridges.Constraint.bridge_constraint(
     func::MOI.AbstractVectorFunction,
     set::MOI.Complements,
 ) where {T}
-    return VerticalBridge{T,MOI.Complements}(
-        reformulate_to_vertical!(model, T, func, set)...,
-    )
+    ci, equalities, slacks = reformulate_to_vertical!(model, T, func, set)
+    return VerticalBridge{T,MOI.Complements}(ci, equalities, slacks)
 end
 
 function MOI.Bridges.Constraint.bridge_constraint(
@@ -48,9 +48,8 @@ function MOI.Bridges.Constraint.bridge_constraint(
     func::MOI.AbstractVectorFunction,
     set::ComplementsWithSetType{S},
 ) where {T,S}
-    return VerticalBridge{T,ComplementsWithSetType{S}}(
-        reformulate_to_vertical!(model, T, func, set)...,
-    )
+    ci, equalities, slacks = reformulate_to_vertical!(model, T, func, set)
+    return VerticalBridge{T,ComplementsWithSetType{S}}(ci, equalities, slacks)
 end
 
 function MOI.supports_constraint(
@@ -88,11 +87,22 @@ end
 # Bridge metadata
 
 function MOI.Bridges.added_constrained_variable_types(::Type{<:VerticalBridge})
-    return Tuple{Type}[]
+    return Tuple{Type}[(MOI.Reals,)]
 end
 
 function MOI.Bridges.added_constraint_types(::Type{VerticalBridge{T,S}}) where {T,S}
-    return Tuple{Type,Type}[(MOI.VectorOfVariables, S)]
+    return Tuple{Type,Type}[
+        (MOI.VectorOfVariables, S),
+        (MOI.ScalarAffineFunction{T}, MOI.EqualTo{T}),
+    ]
+end
+
+function MOI.get(bridge::VerticalBridge, ::MOI.NumberOfVariables)::Int64
+    return length(bridge.slacks)
+end
+
+function MOI.get(bridge::VerticalBridge, ::MOI.ListOfVariableIndices)
+    return copy(bridge.slacks)
 end
 
 function MOI.get(
@@ -109,10 +119,33 @@ function MOI.get(
     return [bridge.constraint]
 end
 
+function MOI.get(
+    bridge::VerticalBridge{T},
+    ::MOI.NumberOfConstraints{MOI.ScalarAffineFunction{T},MOI.EqualTo{T}},
+)::Int64 where {T}
+    return count(
+        ci -> ci isa MOI.ConstraintIndex{MOI.ScalarAffineFunction{T},MOI.EqualTo{T}},
+        bridge.equalities,
+    )
+end
+
+function MOI.get(
+    bridge::VerticalBridge{T},
+    ::MOI.ListOfConstraintIndices{MOI.ScalarAffineFunction{T},MOI.EqualTo{T}},
+) where {T}
+    return MOI.ConstraintIndex{MOI.ScalarAffineFunction{T},MOI.EqualTo{T}}[
+        ci for ci in bridge.equalities if
+        ci isa MOI.ConstraintIndex{MOI.ScalarAffineFunction{T},MOI.EqualTo{T}}
+    ]
+end
+
 function MOI.delete(model::MOI.ModelLike, bridge::VerticalBridge)
     MOI.delete(model, bridge.constraint)
     for ci in bridge.equalities
         MOI.delete(model, ci)
+    end
+    for vi in bridge.slacks
+        MOI.delete(model, vi)
     end
     return
 end
@@ -207,6 +240,7 @@ Once reformulated, the complementarity constraints involve only single variables
 """
 function reformulate_to_vertical!(model::MOI.ModelLike, ::Type{T}, fun, set) where {T}
     equalities = MOI.ConstraintIndex[]
+    slacks = MOI.VariableIndex[]
     ind_cc1, ind_cc2 = MOI.VariableIndex[], MOI.VariableIndex[]
     n_comp = div(set.dimension, 2)
     @assert !(fun isa MOI.VectorOfVariables)
@@ -234,6 +268,7 @@ function reformulate_to_vertical!(model::MOI.ModelLike, ::Type{T}, fun, set) whe
         else
             # Else, reformulate LHS using vertical form
             x1 = MOI.add_variable(model)
+            push!(slacks, x1)
             new_lhs = MOIU.operate!(-, T, lhs, x1)
             push!(
                 equalities,
@@ -251,5 +286,5 @@ function reformulate_to_vertical!(model::MOI.ModelLike, ::Type{T}, fun, set) whe
     else
         ci = MOI.add_constraint(model, comp, S(2*n_cc))
     end
-    return ci, equalities
+    return ci, equalities, slacks
 end
