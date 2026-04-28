@@ -127,4 +127,31 @@ using MathOptComplements
             cannot_unbridge = true,
         )
     end
+
+    @testset "Free variable (Zeros)" begin
+        MOI.Bridges.runtests(
+            MathOptComplements.Bridges.SpecifySetTypeBridge,
+            model -> begin
+                x = MOI.add_variable(model)
+                y = MOI.add_variable(model)
+                MOI.add_constraint(
+                    model,
+                    MOI.VectorOfVariables([x, y]),
+                    MOI.Complements(2),
+                )
+            end,
+            model -> begin
+                x = MOI.add_variable(model)
+                y = MOI.add_variable(model)
+                # x1 must be zero
+                MOI.add_constraint(model, 1.0 * x, MOI.EqualTo(0.0))
+                MOI.add_constraint(
+                    model,
+                    MOI.VectorOfVariables([x, y]),
+                    MathOptComplements.ComplementsWithSetType{MOI.Zeros}(2),
+                )
+            end;
+            cannot_unbridge = true,
+        )
+    end
 end

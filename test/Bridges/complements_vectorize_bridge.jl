@@ -66,4 +66,30 @@ using MathOptComplements
             cannot_unbridge = true,
         )
     end
+
+    @testset "EqualTo → Zeros" begin
+        MOI.Bridges.runtests(
+            MathOptComplements.Bridges.ComplementsVectorizeBridge{Float64},
+            model -> begin
+                x, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
+                y, _ = MOI.add_constrained_variable(model, MOI.EqualTo(2.0))
+                MOI.add_constraint(
+                    model,
+                    MOI.VectorOfVariables([x, y]),
+                    MathOptComplements.ComplementsWithSetType{MOI.EqualTo{Float64}}(2),
+                )
+            end,
+            model -> begin
+                x, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
+                y, _ = MOI.add_constrained_variable(model, MOI.EqualTo(2.0))
+                f = MOIU.operate(vcat, Float64, 1.0 * x, 1.0 * y - 2.0)
+                MOI.add_constraint(
+                    model,
+                    f,
+                    MathOptComplements.ComplementsWithSetType{MOI.Zeros}(2),
+                )
+            end;
+            cannot_unbridge = true,
+        )
+    end
 end
