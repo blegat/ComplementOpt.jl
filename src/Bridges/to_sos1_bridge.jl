@@ -54,7 +54,7 @@ function MOI.Bridges.Constraint.concrete_bridge_type(
     return ToSOS1Bridge{T}
 end
 
-MOI.supports(::MOI.ModelLike, ::ComplementarityReformulation, ::Type{<:ToSOS1Bridge}) = true
+MOI.supports(::MOI.ModelLike, ::ComplementarityReformulation, ::Type{<:ToSOS1Bridge}) = (@show @__LINE__; true)
 
 # Bridge metadata
 

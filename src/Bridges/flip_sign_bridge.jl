@@ -82,8 +82,10 @@ function MOI.Bridges.Constraint.concrete_bridge_type(
     return FlipSignBridge{T,F,S1,S2,G}
 end
 
-MOI.supports(::MOI.ModelLike, ::ComplementarityReformulation, ::Type{<:FlipSignBridge}) =
-    true
+function MOI.supports(::MOI.ModelLike, ::ComplementarityReformulation, ::Type{<:FlipSignBridge})
+    @show @__LINE__
+    return true
+end
 
 function MOI.set(
     model::MOI.ModelLike,
@@ -91,6 +93,7 @@ function MOI.set(
     bridge::FlipSignBridge,
     value::AbstractComplementarityRelaxation,
 )
+    @show @__LINE__
     MOI.set(model, attr, bridge.constraint, value)
     return
 end
