@@ -15,7 +15,6 @@ include("split_interval_bridge.jl")
 include("flip_sign_bridge.jl")
 include("nonlinear.jl")
 include("to_sos1_bridge.jl")
-include("sos1.jl")
 
 """
     add_all_bridges(model::MOI.ModelLike, ::Type{T} = Float64)
