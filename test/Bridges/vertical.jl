@@ -63,11 +63,7 @@ using ComplementOpt
                 y, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
                 x1 = MOI.add_variable(model)
                 # 2x + 3 = x1  →  2x - x1 in EqualTo(-3.0)
-                MOI.add_constraint(
-                    model,
-                    2.0 * x - 1.0 * x1,
-                    MOI.EqualTo(-3.0),
-                )
+                MOI.add_constraint(model, 2.0 * x - 1.0 * x1, MOI.EqualTo(-3.0))
                 MOI.add_constraint(
                     model,
                     MOI.VectorOfVariables([x1, y]),

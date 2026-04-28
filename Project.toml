@@ -13,4 +13,4 @@ ComplementOptJuMPExt = "JuMP"
 
 [compat]
 JuMP = "1"
-MathOptInterface = "1.50.1"
+MathOptInterface = "1.51"

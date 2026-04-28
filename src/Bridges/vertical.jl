@@ -30,8 +30,6 @@ struct VerticalBridge{T,S<:MOI.AbstractVectorSet} <: MOI.Bridges.Constraint.Abst
     constraint::MOI.ConstraintIndex{MOI.VectorOfVariables,S}
     equalities::Vector{MOI.ConstraintIndex}
     slacks::Vector{MOI.VariableIndex}
-    func::MOI.AbstractVectorFunction
-    set::S
 end
 
 function MOI.Bridges.Constraint.bridge_constraint(
@@ -41,7 +39,7 @@ function MOI.Bridges.Constraint.bridge_constraint(
     set::MOI.Complements,
 ) where {T}
     ci, equalities, slacks = reformulate_to_vertical!(model, T, func, set)
-    return VerticalBridge{T,MOI.Complements}(ci, equalities, slacks, func, set)
+    return VerticalBridge{T,MOI.Complements}(ci, equalities, slacks)
 end
 
 function MOI.Bridges.Constraint.bridge_constraint(
@@ -51,7 +49,7 @@ function MOI.Bridges.Constraint.bridge_constraint(
     set::ComplementsWithSetType{S},
 ) where {T,S}
     ci, equalities, slacks = reformulate_to_vertical!(model, T, func, set)
-    return VerticalBridge{T,ComplementsWithSetType{S}}(ci, equalities, slacks, func, set)
+    return VerticalBridge{T,ComplementsWithSetType{S}}(ci, equalities, slacks)
 end
 
 function MOI.supports_constraint(
@@ -136,17 +134,9 @@ function MOI.get(
     ::MOI.ListOfConstraintIndices{MOI.ScalarAffineFunction{T},MOI.EqualTo{T}},
 ) where {T}
     return MOI.ConstraintIndex{MOI.ScalarAffineFunction{T},MOI.EqualTo{T}}[
-        ci for ci in bridge.equalities
-        if ci isa MOI.ConstraintIndex{MOI.ScalarAffineFunction{T},MOI.EqualTo{T}}
+        ci for ci in bridge.equalities if
+        ci isa MOI.ConstraintIndex{MOI.ScalarAffineFunction{T},MOI.EqualTo{T}}
     ]
-end
-
-function MOI.get(::MOI.ModelLike, ::MOI.ConstraintFunction, bridge::VerticalBridge)
-    return copy(bridge.func)
-end
-
-function MOI.get(::MOI.ModelLike, ::MOI.ConstraintSet, bridge::VerticalBridge)
-    return bridge.set
 end
 
 function MOI.delete(model::MOI.ModelLike, bridge::VerticalBridge)
