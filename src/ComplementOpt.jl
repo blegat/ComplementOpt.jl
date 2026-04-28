@@ -12,8 +12,7 @@ using .Bridges:
     ScholtesRelaxation,
     FischerBurmeisterRelaxation,
     LiuFukushimaRelaxation,
-    KanzowSchwarzRelaxation,
-    SOS1Relaxation
+    KanzowSchwarzRelaxation
 
 include("MOI_wrapper.jl")
 
