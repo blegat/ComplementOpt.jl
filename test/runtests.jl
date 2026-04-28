@@ -426,7 +426,10 @@ end
     inner = backend(model).optimizer.model.optimizer.model
     @test MOI.get(
         inner,
-        MOI.NumberOfConstraints{MOI.ScalarQuadraticFunction{Float64},MOI.LessThan{Float64}}(),
+        MOI.NumberOfConstraints{
+            MOI.ScalarQuadraticFunction{Float64},
+            MOI.LessThan{Float64},
+        }(),
     ) == 1
     # Change reformulation after first optimize! (bridge.constraints is populated)
     MOI.set(
