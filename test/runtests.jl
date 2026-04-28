@@ -422,6 +422,12 @@ end
     JuMP.set_silent(model)
     JuMP.optimize!(model)
     @test JuMP.is_solved_and_feasible(model)
+    # Scholtes produces a quadratic constraint
+    inner = backend(model).optimizer.model.optimizer.model
+    @test MOI.get(
+        inner,
+        MOI.NumberOfConstraints{MOI.ScalarQuadraticFunction{Float64},MOI.LessThan{Float64}}(),
+    ) == 1
     # Change reformulation after first optimize! (bridge.constraints is populated)
     MOI.set(
         model,
@@ -431,6 +437,14 @@ end
     )
     @test MOI.get(model, MathOptComplements.ComplementarityReformulation(), c) isa
           MathOptComplements.FischerBurmeisterRelaxation
+    JuMP.optimize!(model)
+    @test JuMP.is_solved_and_feasible(model)
+    inner = backend(model).optimizer.model.optimizer.model
+    # FB produces a nonlinear constraint
+    @test MOI.get(
+        inner,
+        MOI.NumberOfConstraints{MOI.ScalarNonlinearFunction,MOI.LessThan{Float64}}(),
+    ) == 1
 end
 
 @testset "SpecifySetTypeBridge ($(opt_name))" for (opt_name, make_opt) in
