@@ -520,4 +520,15 @@ end
     @test bridge3 isa MathOptComplements.Bridges.FlipSignBridge
 end
 
+@testset "add_all_bridges(::JuMP.GenericModel)" begin
+    model = Model(Ipopt.Optimizer)
+    MathOptComplements.Bridges.add_all_bridges(model)
+    set_silent(model)
+    @variable(model, y <= 0)
+    @constraint(model, y + 1 ⟂ y)
+    optimize!(model)
+    @test is_solved_and_feasible(model)
+    @test value(y) ≈ -1.0 atol = 1e-7
+end
+
 include(joinpath(@__DIR__, "Bridges", "runtests.jl"))
