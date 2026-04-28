@@ -69,12 +69,17 @@ MOI.supports(::MOI.ModelLike, ::ComplementarityReformulation, ::Type{<:Nonlinear
     true
 
 function MOI.set(
-    ::MOI.ModelLike,
+    model::MOI.ModelLike,
     ::ComplementarityReformulation,
     bridge::NonlinearBridge,
     value::AbstractComplementarityRelaxation,
 )
     bridge.reformulation = value
+    # Delete old constraints so that final_touch re-reformulates
+    for ci in bridge.constraints
+        MOI.delete(model, ci)
+    end
+    empty!(bridge.constraints)
     return
 end
 

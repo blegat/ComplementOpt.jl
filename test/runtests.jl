@@ -400,6 +400,56 @@ end
     @test isnothing(MOI.get(model, MathOptComplements.ComplementarityReformulation(), c2))
 end
 
+@testset "Per-constraint reformulation after optimize!" begin
+    model = Model()
+    @variable(model, x)
+    @variable(model, 0.0 <= y)
+    c = @constraint(model, x ⟂ y)
+    @objective(model, Min, (x - 1)^2 + y^2)
+    JuMP.set_optimizer(
+        model,
+        () -> MathOptComplements.Optimizer(
+            MOI.instantiate(Ipopt.Optimizer, with_cache_type = Float64),
+        ),
+        with_cache_type = Float64,
+    )
+    MOI.set(
+        model,
+        MathOptComplements.DefaultComplementarityReformulation(),
+        MathOptComplements.ScholtesRelaxation(0.0),
+    )
+    JuMP.set_optimizer_attribute(model, "bound_relax_factor", 0.0)
+    JuMP.set_silent(model)
+    JuMP.optimize!(model)
+    @test JuMP.is_solved_and_feasible(model)
+    # Scholtes produces a quadratic constraint
+    inner = backend(model).optimizer.model.optimizer.model
+    @test MOI.get(
+        inner,
+        MOI.NumberOfConstraints{
+            MOI.ScalarQuadraticFunction{Float64},
+            MOI.LessThan{Float64},
+        }(),
+    ) == 1
+    # Change reformulation after first optimize! (bridge.constraints is populated)
+    MOI.set(
+        model,
+        MathOptComplements.ComplementarityReformulation(),
+        c,
+        MathOptComplements.FischerBurmeisterRelaxation(1e-8),
+    )
+    @test MOI.get(model, MathOptComplements.ComplementarityReformulation(), c) isa
+          MathOptComplements.FischerBurmeisterRelaxation
+    JuMP.optimize!(model)
+    @test JuMP.is_solved_and_feasible(model)
+    inner = backend(model).optimizer.model.optimizer.model
+    # FB produces a nonlinear constraint
+    @test MOI.get(
+        inner,
+        MOI.NumberOfConstraints{MOI.ScalarNonlinearFunction,MOI.LessThan{Float64}}(),
+    ) == 1
+end
+
 @testset "SpecifySetTypeBridge ($(opt_name))" for (opt_name, make_opt) in
                                                   OPTIMIZER_FACTORIES
 
