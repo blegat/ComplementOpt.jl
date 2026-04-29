@@ -464,10 +464,14 @@ end
     inner = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
     nl_model = MOI.Bridges.Constraint.SingleBridgeOptimizer{
         MathOptComplements.Bridges.NonlinearBridge{Float64},
-    }(inner)
+    }(
+        inner,
+    )
     model = MOI.Bridges.Constraint.SingleBridgeOptimizer{
         MathOptComplements.Bridges.SplitIntervalBridge{Float64},
-    }(nl_model)
+    }(
+        nl_model,
+    )
     x = MOI.add_variable(model)
     y, _ = MOI.add_constrained_variable(model, MOI.Interval(0.0, 1.0))
     ci = MOI.add_constraint(
@@ -480,7 +484,10 @@ end
     MOI.Bridges.final_touch(nl_model)
     @test MOI.get(
         inner,
-        MOI.NumberOfConstraints{MOI.ScalarQuadraticFunction{Float64},MOI.LessThan{Float64}}(),
+        MOI.NumberOfConstraints{
+            MOI.ScalarQuadraticFunction{Float64},
+            MOI.LessThan{Float64},
+        }(),
     ) > 0
     # Change to FB and re-reformulate → nonlinear constraints
     attr = MathOptComplements.ComplementarityReformulation()
@@ -512,7 +519,9 @@ end
     inner = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
     model = MOI.Bridges.Constraint.SingleBridgeOptimizer{
         MathOptComplements.Bridges.FlipSignBridge{Float64},
-    }(inner)
+    }(
+        inner,
+    )
     x, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
     y, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
     ci = MOI.add_constraint(
@@ -525,10 +534,8 @@ end
     MOI.set(model, attr, ci, relax)
     # FlipSign flips Nonpositives → Nonnegatives, check child exists
     S = MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}
-    @test MOI.get(
-        inner,
-        MOI.NumberOfConstraints{MOI.VectorAffineFunction{Float64},S}(),
-    ) == 1
+    @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorAffineFunction{Float64},S}()) ==
+          1
     # Check the attribute was propagated to the child constraint
     b = MOI.Bridges.bridge(model, ci)
     @test MOI.get(inner, attr, b.constraint) isa
@@ -539,7 +546,9 @@ end
     inner = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
     model = MOI.Bridges.Constraint.SingleBridgeOptimizer{
         MathOptComplements.Bridges.ComplementsVectorizeBridge{Float64},
-    }(inner)
+    }(
+        inner,
+    )
     x, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
     y, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(3.0))
     ci = MOI.add_constraint(
@@ -552,10 +561,8 @@ end
     MOI.set(model, attr, ci, relax)
     # ComplementsVectorize shifts GreaterThan → Nonnegatives, check child exists
     S = MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}
-    @test MOI.get(
-        inner,
-        MOI.NumberOfConstraints{MOI.VectorAffineFunction{Float64},S}(),
-    ) == 1
+    @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorAffineFunction{Float64},S}()) ==
+          1
     # Check the attribute was propagated to the child constraint
     b = MOI.Bridges.bridge(model, ci)
     @test MOI.get(inner, attr, b.constraint) isa
