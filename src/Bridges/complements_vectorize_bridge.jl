@@ -41,7 +41,6 @@ function _vector_set_type(::Type{<:MOI.LessThan})
     return MOI.Nonpositives
 end
 function _vector_set_type(::Type{<:MOI.EqualTo})
-    @show @__LINE__
     return MOI.Zeros
 end
 
@@ -67,7 +66,6 @@ function _set_constant(
     ::ComplementsWithSetType{<:MOI.EqualTo},
     x2,
 ) where {T}
-    @show @__LINE__
     return MOIU.get_bounds(model, T, x2)[1]
 end
 
@@ -106,14 +104,11 @@ function MOI.Bridges.Constraint.concrete_bridge_type(
     return ComplementsVectorizeBridge{T,F,S,SV}
 end
 
-function MOI.supports(
+MOI.supports(
     ::MOI.ModelLike,
     ::ComplementarityReformulation,
     ::Type{<:ComplementsVectorizeBridge},
-)
-    @show @__LINE__
-    return true
-end
+) = true
 
 function MOI.set(
     model::MOI.ModelLike,
@@ -121,7 +116,6 @@ function MOI.set(
     bridge::ComplementsVectorizeBridge,
     value::AbstractComplementarityRelaxation,
 )
-    @show @__LINE__
     MOI.set(model, attr, bridge.constraint, value)
     return
 end

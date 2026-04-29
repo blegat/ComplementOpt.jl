@@ -65,10 +65,8 @@ function MOI.Bridges.Constraint.concrete_bridge_type(
     return NonlinearBridge{T,S}
 end
 
-function MOI.supports(::MOI.ModelLike, ::ComplementarityReformulation, ::Type{<:NonlinearBridge})
-    @show @__LINE__
-    return true
-end
+MOI.supports(::MOI.ModelLike, ::ComplementarityReformulation, ::Type{<:NonlinearBridge}) =
+    true
 
 function MOI.set(
     model::MOI.ModelLike,
@@ -135,10 +133,8 @@ _complementarity_bounds(::Type{MOI.Nonnegatives}, model, ::Type{T}, x2) where {T
     (zero(T), T(Inf))
 _complementarity_bounds(::Type{MOI.Nonpositives}, model, ::Type{T}, x2) where {T} =
     (T(-Inf), zero(T))
-function _complementarity_bounds(::Type{MOI.Zeros}, model, ::Type{T}, x2) where {T}
-    @show @__LINE__
-    return (zero(T), zero(T))
-end
+_complementarity_bounds(::Type{MOI.Zeros}, model, ::Type{T}, x2) where {T} =
+    (zero(T), zero(T))
 function _complementarity_bounds(::Type{<:MOI.GreaterThan}, model, ::Type{T}, x2) where {T}
     return (MOIU.get_bounds(model, T, x2)[1], T(Inf))
 end
@@ -230,7 +226,6 @@ function _relax_complementarity_upper_bound!(
 )
     _, ub1 = MOIU.get_bounds(model, Float64, x1)
     if isinf(ub1)
-        @show @__LINE__
         MOI.add_constraint(model, x1, MOI.LessThan(0.0))
     else
         @assert ub1 == 0.0 # ensure we follow MOI's convention
@@ -301,7 +296,6 @@ function _relax_complementarity_lower_bound!(
 )
     lb1, ub1 = MOIU.get_bounds(model, Float64, x1)
     if isinf(lb1)
-        @show @__LINE__
         MOI.add_constraint(model, x1, MOI.GreaterThan(0.0))
     else
         @assert lb1 == 0.0 # ensure we follow MOI's convention
@@ -326,7 +320,6 @@ function _relax_complementarity_upper_bound!(
 )
     lb1, ub1 = MOIU.get_bounds(model, Float64, x1)
     if isinf(ub1)
-        @show @__LINE__
         MOI.add_constraint(model, x1, MOI.LessThan(0.0))
     else
         @assert ub1 == 0.0 # ensure we follow MOI's convention
@@ -478,7 +471,6 @@ function _relax_complementarity_lower_bound!(
 )
     lb1, ub1 = MOIU.get_bounds(model, Float64, x1)
     if isinf(lb1)
-        @show @__LINE__
         MOI.add_constraint(model, x1, MOI.GreaterThan(0.0))
     else
         @assert lb1 == 0.0 # ensure we follow MOI's convention
@@ -503,7 +495,6 @@ function _relax_complementarity_upper_bound!(
 )
     lb1, ub1 = MOIU.get_bounds(model, Float64, x1)
     if isinf(ub1)
-        @show @__LINE__
         MOI.add_constraint(model, x1, MOI.LessThan(0.0))
     else
         @assert ub1 == 0.0 # ensure we follow MOI's convention

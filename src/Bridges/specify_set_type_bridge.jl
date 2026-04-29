@@ -86,7 +86,6 @@ function MOI.set(
 )
     bridge.reformulation = value
     for ci in bridge.constraints
-        @show @__LINE__
         MOI.set(model, attr, ci, value)
     end
     return
@@ -126,7 +125,6 @@ function _specify_set_type_pair!(model, ::Type{T}, x1, x2, bounds) where {T}
         return _specify_range!(model, T, x1, x2, lb2, ub2)
     else
         # Both infinite: x1 must be zero
-        @show @__LINE__
         push!(bounds, MOI.add_constraint(model, one(T) * x1, MOI.EqualTo(zero(T))))
         return MOI.add_constraint(
             model,

@@ -181,8 +181,7 @@ function _is_single_variable(func::MOI.ScalarQuadraticFunction)
     )
         return true
     else
-        @show @__LINE__
-        return false
+        false
     end
 end
 function _is_single_variable(func::MOI.ScalarNonlinearFunction)

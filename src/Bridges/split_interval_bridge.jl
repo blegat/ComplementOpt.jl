@@ -114,7 +114,7 @@ MOI.supports(
     ::MOI.ModelLike,
     ::ComplementarityReformulation,
     ::Type{<:SplitIntervalBridge},
-) = (@show @__LINE__; true)
+) = true
 
 function MOI.set(
     model::MOI.ModelLike,
@@ -122,7 +122,6 @@ function MOI.set(
     bridge::SplitIntervalBridge,
     value::AbstractComplementarityRelaxation,
 )
-    @show @__LINE__
     MOI.set(model, attr, bridge.lower, value)
     MOI.set(model, attr, bridge.upper, value)
     return
@@ -166,7 +165,6 @@ function MOI.get(
     bridge::SplitIntervalBridge{T},
     ::MOI.ListOfConstraintIndices{MOI.VariableIndex,MOI.GreaterThan{T}},
 ) where {T}
-    @show @__LINE__
     return [MOI.ConstraintIndex{MOI.VariableIndex,MOI.GreaterThan{T}}(bridge.xp.value)]
 end
 
@@ -181,7 +179,6 @@ function MOI.get(
     bridge::SplitIntervalBridge{T},
     ::MOI.ListOfConstraintIndices{MOI.VariableIndex,MOI.LessThan{T}},
 ) where {T}
-    @show @__LINE__
     return [MOI.ConstraintIndex{MOI.VariableIndex,MOI.LessThan{T}}(bridge.xn.value)]
 end
 
