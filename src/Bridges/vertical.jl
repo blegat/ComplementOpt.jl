@@ -173,16 +173,12 @@ function _is_single_variable(func::MOI.ScalarAffineFunction)
            iszero(func.constant)
 end
 function _is_single_variable(func::MOI.ScalarQuadraticFunction)
-    if (
+    return (
         length(func.quadratic_terms) == 0 &&
         length(func.affine_terms) == 1 &&
         func.affine_terms[1].coefficient == 1.0 &&
         iszero(func.constant)
     )
-        return true
-    else
-        false
-    end
 end
 function _is_single_variable(func::MOI.ScalarNonlinearFunction)
     return func.head == :+ && length(func.args) == 1 && isa(func.args[1], MOI.VariableIndex)
