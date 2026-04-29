@@ -450,6 +450,33 @@ end
     ) == 1
 end
 
+@testset "ComplementsWithSetType dimension" begin
+    s = MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}(4)
+    @test MOI.dimension(s) == 4
+end
+
+@testset "Optimizer bridge dispatch" begin
+    # NLP path: VectorAffineFunction in ComplementsWithSetType → NonlinearBridge
+    opt_nlp = MathOptComplements.Optimizer(
+        MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}()),
+    )
+    S = MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}
+    @test MOI.Bridges.is_bridged(opt_nlp, S)
+    @test MOI.Bridges.supports_bridging_constrained_variable(opt_nlp, S)
+    @test MOI.Bridges.bridge_type(
+        opt_nlp,
+        MOI.VectorAffineFunction{Float64},
+        S,
+    ) == MathOptComplements.Bridges.NonlinearBridge{Float64,MOI.Nonnegatives}
+    # SOS1 path: VectorOfVariables in ComplementsWithSetType{Zeros} → ToSOS1Bridge
+    opt_sos1 = MathOptComplements.Optimizer(
+        MOI.Bridges.full_bridge_optimizer(HiGHS.Optimizer(), Float64),
+    )
+    S_zeros = MathOptComplements.ComplementsWithSetType{MOI.Zeros}
+    @test MOI.Bridges.bridge_type(opt_sos1, MOI.VectorOfVariables, S_zeros) ==
+          MathOptComplements.Bridges.ToSOS1Bridge{Float64}
+end
+
 @testset "ComplementarityReformulation supports on bridge types" begin
     model = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
     attr = MathOptComplements.ComplementarityReformulation()
