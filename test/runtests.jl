@@ -463,6 +463,11 @@ end
     S = MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}
     @test MOI.Bridges.is_bridged(opt_nlp, S)
     @test MOI.Bridges.supports_bridging_constrained_variable(opt_nlp, S)
+    @test MOI.Bridges.supports_bridging_constraint(
+        opt_nlp,
+        MOI.VectorAffineFunction{Float64},
+        S,
+    )
     @test MOI.Bridges.bridge_type(opt_nlp, MOI.VectorAffineFunction{Float64}, S) ==
           MathOptComplements.Bridges.NonlinearBridge{Float64,MOI.Nonnegatives}
     # SOS1 path: VectorOfVariables in ComplementsWithSetType{Zeros} → ToSOS1Bridge
