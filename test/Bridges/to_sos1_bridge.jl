@@ -12,7 +12,8 @@ using MathOptComplements
         MathOptComplements.Bridges.ToSOS1Bridge,
         model -> begin
             x, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
-            y, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
+            y, _ =
+                MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
             MOI.add_constraint(
                 model,
                 MOI.VectorOfVariables([x, y]),
@@ -21,8 +22,13 @@ using MathOptComplements
         end,
         model -> begin
             x, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
-            y, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
-            MOI.add_constraint(model, MOI.VectorOfVariables([x, y]), MOI.SOS1([1.0, 2.0]))
+            y, _ =
+                MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
+            MOI.add_constraint(
+                model,
+                MOI.VectorOfVariables([x, y]),
+                MOI.SOS1([1.0, 2.0]),
+            )
         end;
         cannot_unbridge = true,
     )

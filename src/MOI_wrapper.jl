@@ -3,7 +3,8 @@
 # Use of this source code is governed by an MIT-style license that can be found
 # in the LICENSE.md file or at https://opensource.org/licenses/MIT.
 
-mutable struct Optimizer{T,O<:MOI.ModelLike} <: MOI.Bridges.AbstractBridgeOptimizer
+mutable struct Optimizer{T,O<:MOI.ModelLike} <:
+               MOI.Bridges.AbstractBridgeOptimizer
     model::O # This need to be called `model` by convention of `AbstractBridgeOptimizer`
     reformulation::AbstractComplementarityRelaxation
     constraint_map::MOI.Bridges.Constraint.Map
@@ -44,62 +45,86 @@ MOI.Bridges.is_bridged(::Optimizer, ::Type{<:MOI.AbstractSet}) = false
 
 # Complements and ComplementsWithSetType are bridged
 MOI.Bridges.is_bridged(::Optimizer, ::Type{MOI.Complements}) = true
-MOI.Bridges.supports_bridging_constrained_variable(::Optimizer, ::Type{MOI.Complements}) =
-    true
-MOI.Bridges.bridge_type(::Optimizer{T}, ::Type{MOI.Complements}) where {T} =
-    Bridges.SpecifySetTypeBridge{T}
+function MOI.Bridges.supports_bridging_constrained_variable(
+    ::Optimizer,
+    ::Type{MOI.Complements},
+)
+    return true
+end
+function MOI.Bridges.bridge_type(
+    ::Optimizer{T},
+    ::Type{MOI.Complements},
+) where {T}
+    return Bridges.SpecifySetTypeBridge{T}
+end
 
 MOI.Bridges.is_bridged(::Optimizer, ::Type{<:ComplementsWithSetType}) = true
-MOI.Bridges.supports_bridging_constrained_variable(
+function MOI.Bridges.supports_bridging_constrained_variable(
     ::Optimizer,
     ::Type{<:ComplementsWithSetType},
-) = true
+)
+    return true
+end
 
 # No objective bridge
 MOI.Bridges.is_bridged(::Optimizer, ::Type{<:MOI.AbstractFunction}) = false
 
 # We only bridge Complements and ComplementsWithSetType constraints
-MOI.Bridges.is_bridged(
+function MOI.Bridges.is_bridged(
     ::Optimizer,
     ::Type{<:MOI.AbstractFunction},
     ::Type{<:MOI.AbstractSet},
-) = false
+)
+    return false
+end
 
 # Expression-based Complements → Bridges.VerticalBridge
-MOI.Bridges.is_bridged(
+function MOI.Bridges.is_bridged(
     ::Optimizer,
     ::Type{<:MOI.AbstractVectorFunction},
     ::Type{MOI.Complements},
-) = true
-MOI.Bridges.supports_bridging_constraint(
+)
+    return true
+end
+function MOI.Bridges.supports_bridging_constraint(
     ::Optimizer,
     ::Type{<:MOI.AbstractVectorFunction},
     ::Type{MOI.Complements},
-) = true
-MOI.Bridges.bridge_type(
+)
+    return true
+end
+function MOI.Bridges.bridge_type(
     ::Optimizer{T},
     ::Type{<:MOI.AbstractVectorFunction},
     ::Type{MOI.Complements},
-) where {T} = Bridges.VerticalBridge{T,MOI.Complements}
+) where {T}
+    return Bridges.VerticalBridge{T,MOI.Complements}
+end
 
 # VectorOfVariables-in-Complements → Bridges.SpecifySetTypeBridge{T}
-MOI.Bridges.bridge_type(
+function MOI.Bridges.bridge_type(
     ::Optimizer{T},
     ::Type{<:MOI.VectorOfVariables},
     ::Type{MOI.Complements},
-) where {T} = Bridges.SpecifySetTypeBridge{T}
+) where {T}
+    return Bridges.SpecifySetTypeBridge{T}
+end
 
 # ComplementsWithSetType{S} → bridge selection depends on inner solver
-MOI.Bridges.is_bridged(
+function MOI.Bridges.is_bridged(
     ::Optimizer,
     ::Type{<:MOI.AbstractVectorFunction},
     ::Type{<:ComplementsWithSetType},
-) = true
-MOI.Bridges.supports_bridging_constraint(
+)
+    return true
+end
+function MOI.Bridges.supports_bridging_constraint(
     ::Optimizer,
     ::Type{<:MOI.AbstractVectorFunction},
     ::Type{<:ComplementsWithSetType},
-) = true
+)
+    return true
+end
 
 # --- NLP path: inner solver supports ScalarNonlinearFunction ---
 # NonlinearBridge handles all set types directly via relaxation methods.
@@ -138,36 +163,49 @@ end
 # The goal is to reach VOV-in-ComplementsWithSetType{Nonnegatives} → ToSOS1Bridge.
 
 # Interval → SplitInterval (split into GreaterThan + LessThan)
-_sos1_bridge_type(
+function _sos1_bridge_type(
     ::Type{T},
     ::Type{MOI.VectorOfVariables},
     ::Type{<:MOI.Interval},
-) where {T} = Bridges.SplitIntervalBridge{T}
+) where {T}
+    return Bridges.SplitIntervalBridge{T}
+end
 
 # LessThan/Nonpositives → FlipSign (negate activity to get GreaterThan/Nonnegatives)
-_sos1_bridge_type(
+function _sos1_bridge_type(
     ::Type{T},
     ::Type{MOI.VectorOfVariables},
     ::Type{<:Union{MOI.LessThan,MOI.Nonpositives}},
-) where {T} = Bridges.FlipSignBridge{T}
+) where {T}
+    return Bridges.FlipSignBridge{T}
+end
 
 # VOV-in-GreaterThan/EqualTo → Vectorize (shift to Nonneg/Zeros)
-_sos1_bridge_type(
+function _sos1_bridge_type(
     ::Type{T},
     ::Type{MOI.VectorOfVariables},
     ::Type{<:Union{MOI.GreaterThan,MOI.EqualTo}},
-) where {T} = Bridges.ComplementsVectorizeBridge{T}
+) where {T}
+    return Bridges.ComplementsVectorizeBridge{T}
+end
 
 # VOV-in-Nonnegatives → ToSOS1Bridge (final target)
-_sos1_bridge_type(
+function _sos1_bridge_type(
     ::Type{T},
     ::Type{MOI.VectorOfVariables},
     ::Type{MOI.Nonnegatives},
-) where {T} = Bridges.ToSOS1Bridge{T}
+) where {T}
+    return Bridges.ToSOS1Bridge{T}
+end
 
 # VOV-in-Zeros → ToSOS1Bridge (trivial complementarity)
-_sos1_bridge_type(::Type{T}, ::Type{MOI.VectorOfVariables}, ::Type{MOI.Zeros}) where {T} =
-    Bridges.ToSOS1Bridge{T}
+function _sos1_bridge_type(
+    ::Type{T},
+    ::Type{MOI.VectorOfVariables},
+    ::Type{MOI.Zeros},
+) where {T}
+    return Bridges.ToSOS1Bridge{T}
+end
 
 # Any non-VOV function → VerticalBridge (create slacks, then re-enter as VOV)
 function _sos1_bridge_type(
@@ -196,11 +234,19 @@ function MOI.set(
     return
 end
 
-MOI.Utilities.map_indices(::Function, relax::AbstractComplementarityRelaxation) = relax
+function MOI.Utilities.map_indices(
+    ::Function,
+    relax::AbstractComplementarityRelaxation,
+)
+    return relax
+end
 
 _additional_arguments(::Optimizer, ::Type) = tuple()
 
-function _additional_arguments(model::Optimizer, ::Type{<:Bridges.NonlinearBridge})
+function _additional_arguments(
+    model::Optimizer,
+    ::Type{<:Bridges.NonlinearBridge},
+)
     # Create a 1-element tuple since it is splatted in `add_bridged_constraint`
     return (model.reformulation,)
 end

@@ -104,7 +104,8 @@ function design_centering_model()
     for k in 1:3
         @constraint(
             model,
-            [-(y[1, k] - x[1])^2 - (y[2, k] - x[2])^2 + x[3]^2, l[k]] ∈ MOI.Complements(2)
+            [-(y[1, k] - x[1])^2 - (y[2, k] - x[2])^2 + x[3]^2, l[k]] ∈
+            MOI.Complements(2)
         )
     end
     return model
@@ -145,7 +146,10 @@ function desilva_model()
     @variable(model, 0.0 <= l[1:2])
     @objective(model, Min, x[1]^2 - 2*x[1] + x[2]^2 - 2*x[2] + y[1]^2 + y[2]^2)
     for i in 1:2
-        @constraint(model, 2.0*y[i] - 2.0*x[i] + 2.0 * (y[i] - 1.0) * l[i] == 0.0)
+        @constraint(
+            model,
+            2.0*y[i] - 2.0*x[i] + 2.0 * (y[i] - 1.0) * l[i] == 0.0
+        )
         @constraint(model, [0.25 - (y[i] - 1.0)^2, l[i]] ∈ MOI.Complements(2))
     end
     return model
@@ -216,7 +220,8 @@ function hakonsen_model_broken()
     @constraint(
         model,
         consum2[i=1:2],
-        [(x[i] * (3.0 * p[i] * (1+t[i])) - 100.0 * pL), p[i]] ∈ MOI.Complements(2)
+        [(x[i] * (3.0 * p[i] * (1+t[i])) - 100.0 * pL), p[i]] ∈
+        MOI.Complements(2)
     )
     @constraint(model, L*pL == sum(x[i] * p[i] for i in 1:2) + l*pL + G)
     @constraint(model, revenue, sum(p[i] * t[i] * x[i] for i in 1:2) >= G)
@@ -359,7 +364,9 @@ function water_net_model()
         :N => 3500,
     )
 
-    dist = Dict((i, j) => sqrt((x[i] - x[j])^2 + (y[i] - y[j])^2) for (i, j) in arcs)
+    dist = Dict(
+        (i, j) => sqrt((x[i] - x[j])^2 + (y[i] - y[j])^2) for (i, j) in arcs
+    )
 
     dpow = 5.33      # ... power on diameter in pressure loss equation
     dmin = 0.15      # ... minimum diameter of pipe
@@ -386,14 +393,22 @@ function water_net_model()
     @variable(model, 0 <= qp[arcs])
     @variable(model, 0 <= qn[arcs])
     @variable(model, dmin <= d[arcs] <= dmax, start=davg)
-    @variable(model, h[i in nodes], start=hl[i] + 5.0, lower_bound=hl[i], upper_bound=100)
+    @variable(
+        model,
+        h[i in nodes],
+        start=hl[i] + 5.0,
+        lower_bound=hl[i],
+        upper_bound=100
+    )
     @variable(model, 0 <= s[i in reservoirs] <= supply[i], start=rr*supply[i])
 
     @objective(
         model,
         Min,
-        sum(s[i] * pcost[i] * (h[i] - height[i]) + s[i] * wcost[i] for i in reservoirs) /
-        r +
+        sum(
+            s[i] * pcost[i] * (h[i] - height[i]) + s[i] * wcost[i] for
+            i in reservoirs
+        ) / r +
         dprc * sum(dist[(i, j)] * d[(i, j)]^cpow for (i, j) in arcs) +
         sum(qp[(i, j)] + qn[(i, j)] for (i, j) in arcs),
     )
@@ -416,7 +431,11 @@ function water_net_model()
         hloss * dist[(i, j)] * (qp[(i, j)]^2 - qn[(i, j)]^2) / (d[(i, j)]^dpow),
     )
     # ... complementarity
-    @constraint(model, [(i, j) in arcs], [qp[(i, j)], qn[(i, j)]] ∈ MOI.Complements(2))
+    @constraint(
+        model,
+        [(i, j) in arcs],
+        [qp[(i, j)], qn[(i, j)]] ∈ MOI.Complements(2)
+    )
 
     return model
 end

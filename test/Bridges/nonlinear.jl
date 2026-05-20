@@ -13,16 +13,24 @@ using MathOptComplements
             MathOptComplements.Bridges.NonlinearBridge,
             model -> begin
                 x1, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
-                x2, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
+                x2, _ = MOI.add_constrained_variable(
+                    model,
+                    MOI.GreaterThan(0.0),
+                )
                 MOI.add_constraint(
                     model,
                     MOI.VectorOfVariables([x1, x2]),
-                    MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}(2),
+                    MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}(
+                        2,
+                    ),
                 )
             end,
             model -> begin
                 x1, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
-                x2, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
+                x2, _ = MOI.add_constrained_variable(
+                    model,
+                    MOI.GreaterThan(0.0),
+                )
                 # x1 * (x2 - 0) <= 0
                 MOI.add_constraint(model, x1 * (x2 - 0.0), MOI.LessThan(0.0))
             end;
@@ -35,16 +43,20 @@ using MathOptComplements
             MathOptComplements.Bridges.NonlinearBridge,
             model -> begin
                 x1, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
-                x2, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
+                x2, _ =
+                    MOI.add_constrained_variable(model, MOI.LessThan(0.0))
                 MOI.add_constraint(
                     model,
                     MOI.VectorOfVariables([x1, x2]),
-                    MathOptComplements.ComplementsWithSetType{MOI.Nonpositives}(2),
+                    MathOptComplements.ComplementsWithSetType{MOI.Nonpositives}(
+                        2,
+                    ),
                 )
             end,
             model -> begin
                 x1, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
-                x2, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
+                x2, _ =
+                    MOI.add_constrained_variable(model, MOI.LessThan(0.0))
                 # x1 * (x2 - 0) <= 0
                 MOI.add_constraint(model, x1 * (x2 - 0.0), MOI.LessThan(0.0))
             end;
@@ -57,16 +69,26 @@ using MathOptComplements
             MathOptComplements.Bridges.NonlinearBridge,
             model -> begin
                 x1, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
-                x2, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(3.0))
+                x2, _ = MOI.add_constrained_variable(
+                    model,
+                    MOI.GreaterThan(3.0),
+                )
                 MOI.add_constraint(
                     model,
                     MOI.VectorOfVariables([x1, x2]),
-                    MathOptComplements.ComplementsWithSetType{MOI.GreaterThan{Float64}}(2),
+                    MathOptComplements.ComplementsWithSetType{
+                        MOI.GreaterThan{Float64},
+                    }(
+                        2,
+                    ),
                 )
             end,
             model -> begin
                 x1, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
-                x2, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(3.0))
+                x2, _ = MOI.add_constrained_variable(
+                    model,
+                    MOI.GreaterThan(3.0),
+                )
                 # x1 * (x2 - 3) <= 0
                 MOI.add_constraint(model, x1 * (x2 - 3.0), MOI.LessThan(0.0))
             end;
@@ -123,16 +145,22 @@ using MathOptComplements
             MathOptComplements.Bridges.NonlinearBridge,
             model -> begin
                 x1, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
-                x2, _ = MOI.add_constrained_variable(model, MOI.LessThan(-2.0))
+                x2, _ =
+                    MOI.add_constrained_variable(model, MOI.LessThan(-2.0))
                 MOI.add_constraint(
                     model,
                     MOI.VectorOfVariables([x1, x2]),
-                    MathOptComplements.ComplementsWithSetType{MOI.LessThan{Float64}}(2),
+                    MathOptComplements.ComplementsWithSetType{
+                        MOI.LessThan{Float64},
+                    }(
+                        2,
+                    ),
                 )
             end,
             model -> begin
                 x1, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
-                x2, _ = MOI.add_constrained_variable(model, MOI.LessThan(-2.0))
+                x2, _ =
+                    MOI.add_constrained_variable(model, MOI.LessThan(-2.0))
                 # x1 * (x2 - (-2)) <= 0
                 MOI.add_constraint(model, x1 * (x2 + 2.0), MOI.LessThan(0.0))
             end;
@@ -155,15 +183,26 @@ using MathOptComplements
             MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}(2),
         )
         relax = MathOptComplements.FischerBurmeisterRelaxation(1e-8)
-        MOI.set(model, MathOptComplements.ComplementarityReformulation(), ci, relax)
+        MOI.set(
+            model,
+            MathOptComplements.ComplementarityReformulation(),
+            ci,
+            relax,
+        )
         MOI.Bridges.final_touch(model)
         @test MOI.get(
             inner,
-            MOI.NumberOfConstraints{MOI.VariableIndex,MOI.GreaterThan{Float64}}(),
+            MOI.NumberOfConstraints{
+                MOI.VariableIndex,
+                MOI.GreaterThan{Float64},
+            }(),
         ) == 2
         @test MOI.get(
             inner,
-            MOI.NumberOfConstraints{MOI.ScalarNonlinearFunction,MOI.LessThan{Float64}}(),
+            MOI.NumberOfConstraints{
+                MOI.ScalarNonlinearFunction,
+                MOI.LessThan{Float64},
+            }(),
         ) == 1
     end
 
@@ -182,7 +221,12 @@ using MathOptComplements
             MathOptComplements.ComplementsWithSetType{MOI.Nonpositives}(2),
         )
         relax = MathOptComplements.FischerBurmeisterRelaxation(1e-8)
-        MOI.set(model, MathOptComplements.ComplementarityReformulation(), ci, relax)
+        MOI.set(
+            model,
+            MathOptComplements.ComplementarityReformulation(),
+            ci,
+            relax,
+        )
         MOI.Bridges.final_touch(model)
         @test MOI.get(
             inner,
@@ -190,7 +234,10 @@ using MathOptComplements
         ) == 2
         @test MOI.get(
             inner,
-            MOI.NumberOfConstraints{MOI.ScalarNonlinearFunction,MOI.GreaterThan{Float64}}(),
+            MOI.NumberOfConstraints{
+                MOI.ScalarNonlinearFunction,
+                MOI.GreaterThan{Float64},
+            }(),
         ) == 1
     end
 
@@ -209,11 +256,19 @@ using MathOptComplements
             MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}(2),
         )
         relax = MathOptComplements.KanzowSchwarzRelaxation(1e-8)
-        MOI.set(model, MathOptComplements.ComplementarityReformulation(), ci, relax)
+        MOI.set(
+            model,
+            MathOptComplements.ComplementarityReformulation(),
+            ci,
+            relax,
+        )
         MOI.Bridges.final_touch(model)
         @test MOI.get(
             inner,
-            MOI.NumberOfConstraints{MOI.VariableIndex,MOI.GreaterThan{Float64}}(),
+            MOI.NumberOfConstraints{
+                MOI.VariableIndex,
+                MOI.GreaterThan{Float64},
+            }(),
         ) == 2
     end
 
@@ -232,7 +287,12 @@ using MathOptComplements
             MathOptComplements.ComplementsWithSetType{MOI.Nonpositives}(2),
         )
         relax = MathOptComplements.KanzowSchwarzRelaxation(1e-8)
-        MOI.set(model, MathOptComplements.ComplementarityReformulation(), ci, relax)
+        MOI.set(
+            model,
+            MathOptComplements.ComplementarityReformulation(),
+            ci,
+            relax,
+        )
         MOI.Bridges.final_touch(model)
         @test MOI.get(
             inner,

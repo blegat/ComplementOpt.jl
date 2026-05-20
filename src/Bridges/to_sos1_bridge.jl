@@ -83,7 +83,11 @@ function MOI.get(
     return [bridge.sos1]
 end
 
-function MOI.get(model::MOI.ModelLike, ::MOI.ConstraintFunction, bridge::ToSOS1Bridge)
+function MOI.get(
+    model::MOI.ModelLike,
+    ::MOI.ConstraintFunction,
+    bridge::ToSOS1Bridge,
+)
     return MOI.get(model, MOI.ConstraintFunction(), bridge.sos1)
 end
 

@@ -39,8 +39,11 @@ must be a variable.
 where `G` is the scalar function type of the first component.
 
 """
-struct SplitIntervalBridge{T,G<:MOI.AbstractScalarFunction,F<:MOI.AbstractVectorFunction} <:
-       MOI.Bridges.Constraint.AbstractBridge
+struct SplitIntervalBridge{
+    T,
+    G<:MOI.AbstractScalarFunction,
+    F<:MOI.AbstractVectorFunction,
+} <: MOI.Bridges.Constraint.AbstractBridge
     lower::MOI.ConstraintIndex{
         MOI.VectorOfVariables,
         ComplementsWithSetType{MOI.GreaterThan{T}},
@@ -71,7 +74,9 @@ function MOI.Bridges.Constraint.bridge_constraint(
         y
     else
         # Extract the variable from a ScalarAffineFunction wrapping a single variable
-        @assert length(y.terms) == 1 && isone(y.terms[1].coefficient) && iszero(y.constant)
+        @assert length(y.terms) == 1 &&
+                isone(y.terms[1].coefficient) &&
+                iszero(y.constant)
         y.terms[1].variable
     end
     # Create xp >= 0 and xn <= 0
@@ -80,7 +85,8 @@ function MOI.Bridges.Constraint.bridge_constraint(
     # x == xp + xn
     eq_func = MOIU.operate(-, T, x_func, xp)
     eq_func = MOIU.operate!(-, T, eq_func, xn)
-    equality = MOIU.normalize_and_add_constraint(model, eq_func, MOI.EqualTo(zero(T)))
+    equality =
+        MOIU.normalize_and_add_constraint(model, eq_func, MOI.EqualTo(zero(T)))
     # [xp, y] in ComplementsWithSetType{GreaterThan{T}}
     lower = MOI.add_constraint(
         model,
@@ -93,7 +99,15 @@ function MOI.Bridges.Constraint.bridge_constraint(
         MOI.VectorOfVariables([xn, y_var]),
         ComplementsWithSetType{MOI.LessThan{T}}(2),
     )
-    return SplitIntervalBridge{T,G,typeof(func)}(lower, upper, equality, xp, xn, func, set)
+    return SplitIntervalBridge{T,G,typeof(func)}(
+        lower,
+        upper,
+        equality,
+        xp,
+        xn,
+        func,
+        set,
+    )
 end
 
 function MOI.supports_constraint(
@@ -115,11 +129,13 @@ function MOI.Bridges.Constraint.concrete_bridge_type(
     return SplitIntervalBridge{T,H,F}
 end
 
-MOI.supports(
+function MOI.supports(
     ::MOI.ModelLike,
     ::ComplementarityReformulation,
     ::Type{<:SplitIntervalBridge},
-) = true
+)
+    return true
+end
 
 function MOI.set(
     model::MOI.ModelLike,
@@ -140,7 +156,9 @@ function MOI.Bridges.added_constrained_variable_types(
     return Tuple{Type}[(MOI.GreaterThan{T},), (MOI.LessThan{T},)]
 end
 
-function MOI.Bridges.added_constraint_types(::Type{<:SplitIntervalBridge{T,G}}) where {T,G}
+function MOI.Bridges.added_constraint_types(
+    ::Type{<:SplitIntervalBridge{T,G}},
+) where {T,G}
     return Tuple{Type,Type}[
         (MOI.VectorOfVariables, ComplementsWithSetType{MOI.GreaterThan{T}}),
         (MOI.VectorOfVariables, ComplementsWithSetType{MOI.LessThan{T}}),
@@ -170,7 +188,11 @@ function MOI.get(
     bridge::SplitIntervalBridge{T},
     ::MOI.ListOfConstraintIndices{MOI.VariableIndex,MOI.GreaterThan{T}},
 ) where {T}
-    return [MOI.ConstraintIndex{MOI.VariableIndex,MOI.GreaterThan{T}}(bridge.xp.value)]
+    return [
+        MOI.ConstraintIndex{MOI.VariableIndex,MOI.GreaterThan{T}}(
+            bridge.xp.value,
+        ),
+    ]
 end
 
 function MOI.get(
@@ -184,7 +206,9 @@ function MOI.get(
     bridge::SplitIntervalBridge{T},
     ::MOI.ListOfConstraintIndices{MOI.VariableIndex,MOI.LessThan{T}},
 ) where {T}
-    return [MOI.ConstraintIndex{MOI.VariableIndex,MOI.LessThan{T}}(bridge.xn.value)]
+    return [
+        MOI.ConstraintIndex{MOI.VariableIndex,MOI.LessThan{T}}(bridge.xn.value),
+    ]
 end
 
 function MOI.get(
@@ -241,11 +265,19 @@ function MOI.get(
     return [bridge.equality]
 end
 
-function MOI.get(::MOI.ModelLike, ::MOI.ConstraintFunction, bridge::SplitIntervalBridge)
+function MOI.get(
+    ::MOI.ModelLike,
+    ::MOI.ConstraintFunction,
+    bridge::SplitIntervalBridge,
+)
     return bridge.func
 end
 
-function MOI.get(::MOI.ModelLike, ::MOI.ConstraintSet, bridge::SplitIntervalBridge)
+function MOI.get(
+    ::MOI.ModelLike,
+    ::MOI.ConstraintSet,
+    bridge::SplitIntervalBridge,
+)
     return bridge.set
 end
 

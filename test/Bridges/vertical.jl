@@ -15,7 +15,10 @@ using MathOptComplements
                 x = MOI.add_variable(model)
                 z = MOI.add_variable(model)
                 y = MOI.add_variable(model)
-                w, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
+                w, _ = MOI.add_constrained_variable(
+                    model,
+                    MOI.GreaterThan(0.0),
+                )
                 f = MOI.VectorAffineFunction{Float64}(
                     [
                         MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(2.0, x)),
@@ -31,7 +34,10 @@ using MathOptComplements
                 x = MOI.add_variable(model)
                 z = MOI.add_variable(model)
                 y = MOI.add_variable(model)
-                w, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
+                w, _ = MOI.add_constrained_variable(
+                    model,
+                    MOI.GreaterThan(0.0),
+                )
                 # 2x + 3 = 0  →  2x in EqualTo(-3.0)  (y is unbounded)
                 MOI.add_constraint(model, 2.0 * x, MOI.EqualTo(-3.0))
                 MOI.add_constraint(
@@ -49,7 +55,10 @@ using MathOptComplements
             MathOptComplements.Bridges.VerticalBridge,
             model -> begin
                 x = MOI.add_variable(model)
-                y, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
+                y, _ = MOI.add_constrained_variable(
+                    model,
+                    MOI.GreaterThan(0.0),
+                )
                 f = MOI.VectorAffineFunction{Float64}(
                     [
                         MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(2.0, x)),
@@ -60,19 +69,30 @@ using MathOptComplements
                 MOI.add_constraint(
                     model,
                     f,
-                    MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}(2),
+                    MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}(
+                        2,
+                    ),
                 )
             end,
             model -> begin
                 x = MOI.add_variable(model)
-                y, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
+                y, _ = MOI.add_constrained_variable(
+                    model,
+                    MOI.GreaterThan(0.0),
+                )
                 x1 = MOI.add_variable(model)
                 # 2x + 3 = x1  →  2x - x1 in EqualTo(-3.0)
-                MOI.add_constraint(model, 2.0 * x - 1.0 * x1, MOI.EqualTo(-3.0))
+                MOI.add_constraint(
+                    model,
+                    2.0 * x - 1.0 * x1,
+                    MOI.EqualTo(-3.0),
+                )
                 MOI.add_constraint(
                     model,
                     MOI.VectorOfVariables([x1, y]),
-                    MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}(2),
+                    MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}(
+                        2,
+                    ),
                 )
             end;
             cannot_unbridge = true,

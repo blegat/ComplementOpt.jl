@@ -51,7 +51,8 @@ function _flip_set_type(::Type{MOI.LessThan{T}}) where {T}
     return MOI.GreaterThan{T}
 end
 
-const _FlippableSets = Union{MOI.Nonnegatives,MOI.Nonpositives,MOI.GreaterThan,MOI.LessThan}
+const _FlippableSets =
+    Union{MOI.Nonnegatives,MOI.Nonpositives,MOI.GreaterThan,MOI.LessThan}
 
 function MOI.Bridges.Constraint.bridge_constraint(
     ::Type{FlipSignBridge{T,F,S1,S2,G}},
@@ -87,8 +88,13 @@ function MOI.Bridges.Constraint.concrete_bridge_type(
     return FlipSignBridge{T,F,S1,S2,G}
 end
 
-MOI.supports(::MOI.ModelLike, ::ComplementarityReformulation, ::Type{<:FlipSignBridge}) =
-    true
+function MOI.supports(
+    ::MOI.ModelLike,
+    ::ComplementarityReformulation,
+    ::Type{<:FlipSignBridge},
+)
+    return true
+end
 
 function MOI.set(
     model::MOI.ModelLike,
@@ -126,7 +132,11 @@ function MOI.get(
     return [bridge.constraint]
 end
 
-function MOI.get(::MOI.ModelLike, ::MOI.ConstraintFunction, bridge::FlipSignBridge)
+function MOI.get(
+    ::MOI.ModelLike,
+    ::MOI.ConstraintFunction,
+    bridge::FlipSignBridge,
+)
     return bridge.original_func
 end
 

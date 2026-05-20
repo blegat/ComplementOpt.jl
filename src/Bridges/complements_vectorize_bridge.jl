@@ -34,7 +34,8 @@ where `T` is the coefficient type.
     [`MOI.Zeros`](@ref) depending on the input set type
 
 """
-struct ComplementsVectorizeBridge{T,F,S,SV} <: MOI.Bridges.Constraint.AbstractBridge
+struct ComplementsVectorizeBridge{T,F,S,SV} <:
+       MOI.Bridges.Constraint.AbstractBridge
     constraint::MOI.ConstraintIndex{F,ComplementsWithSetType{SV}}
     set_constant::T
 end
@@ -93,7 +94,11 @@ end
 function MOI.supports_constraint(
     ::Type{<:ComplementsVectorizeBridge},
     ::Type{MOI.VectorOfVariables},
-    ::Type{<:ComplementsWithSetType{<:Union{MOI.GreaterThan,MOI.LessThan,MOI.EqualTo}}},
+    ::Type{
+        <:ComplementsWithSetType{
+            <:Union{MOI.GreaterThan,MOI.LessThan,MOI.EqualTo},
+        },
+    },
 )
     return true
 end
@@ -109,11 +114,13 @@ function MOI.Bridges.Constraint.concrete_bridge_type(
     return ComplementsVectorizeBridge{T,F,S,SV}
 end
 
-MOI.supports(
+function MOI.supports(
     ::MOI.ModelLike,
     ::ComplementarityReformulation,
     ::Type{<:ComplementsVectorizeBridge},
-) = true
+)
+    return true
+end
 
 function MOI.set(
     model::MOI.ModelLike,
@@ -127,7 +134,9 @@ end
 
 # Bridge metadata
 
-function MOI.Bridges.added_constrained_variable_types(::Type{<:ComplementsVectorizeBridge})
+function MOI.Bridges.added_constrained_variable_types(
+    ::Type{<:ComplementsVectorizeBridge},
+)
     return Tuple{Type}[]
 end
 
