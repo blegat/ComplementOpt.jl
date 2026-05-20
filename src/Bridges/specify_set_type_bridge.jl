@@ -72,11 +72,13 @@ function MOI.Bridges.Constraint.concrete_bridge_type(
     return SpecifySetTypeBridge{T}
 end
 
-MOI.supports(
+function MOI.supports(
     ::MOI.ModelLike,
     ::ComplementarityReformulation,
     ::Type{<:SpecifySetTypeBridge},
-) = true
+)
+    return true
+end
 
 function MOI.set(
     model::MOI.ModelLike,
@@ -109,7 +111,12 @@ function MOI.Bridges.final_touch(
     end
     if bridge.reformulation !== nothing
         for ci in bridge.constraints
-            MOI.set(model, ComplementarityReformulation(), ci, bridge.reformulation)
+            MOI.set(
+                model,
+                ComplementarityReformulation(),
+                ci,
+                bridge.reformulation,
+            )
         end
     end
     return
@@ -125,7 +132,10 @@ function _specify_set_type_pair!(model, ::Type{T}, x1, x2, bounds) where {T}
         return _specify_range!(model, T, x1, x2, lb2, ub2)
     else
         # Both infinite: x1 must be zero
-        push!(bounds, MOI.add_constraint(model, one(T) * x1, MOI.EqualTo(zero(T))))
+        push!(
+            bounds,
+            MOI.add_constraint(model, one(T) * x1, MOI.EqualTo(zero(T))),
+        )
         return MOI.add_constraint(
             model,
             MOI.VectorOfVariables([x1, x2]),
@@ -170,11 +180,15 @@ end
 
 # Bridge metadata
 
-function MOI.Bridges.added_constrained_variable_types(::Type{<:SpecifySetTypeBridge})
+function MOI.Bridges.added_constrained_variable_types(
+    ::Type{<:SpecifySetTypeBridge},
+)
     return Tuple{Type}[]
 end
 
-function MOI.Bridges.added_constraint_types(::Type{SpecifySetTypeBridge{T}}) where {T}
+function MOI.Bridges.added_constraint_types(
+    ::Type{SpecifySetTypeBridge{T}},
+) where {T}
     return Tuple{Type,Type}[
         (MOI.VectorOfVariables, ComplementsWithSetType{MOI.Nonnegatives}),
         (MOI.VectorOfVariables, ComplementsWithSetType{MOI.Nonpositives}),
@@ -187,7 +201,6 @@ function MOI.Bridges.added_constraint_types(::Type{SpecifySetTypeBridge{T}}) whe
         (MOI.ScalarAffineFunction{T}, MOI.EqualTo{T}),
     ]
 end
-
 
 function MOI.get(
     bridge::SpecifySetTypeBridge,
@@ -202,14 +215,24 @@ function MOI.get(
     ::MOI.ListOfConstraintIndices{F,S},
 ) where {F,S}
     all_cis = [bridge.constraints; bridge.bounds]
-    return MOI.ConstraintIndex{F,S}[ci for ci in all_cis if ci isa MOI.ConstraintIndex{F,S}]
+    return MOI.ConstraintIndex{F,S}[
+        ci for ci in all_cis if ci isa MOI.ConstraintIndex{F,S}
+    ]
 end
 
-function MOI.get(::MOI.ModelLike, ::MOI.ConstraintFunction, bridge::SpecifySetTypeBridge)
+function MOI.get(
+    ::MOI.ModelLike,
+    ::MOI.ConstraintFunction,
+    bridge::SpecifySetTypeBridge,
+)
     return bridge.func
 end
 
-function MOI.get(::MOI.ModelLike, ::MOI.ConstraintSet, bridge::SpecifySetTypeBridge)
+function MOI.get(
+    ::MOI.ModelLike,
+    ::MOI.ConstraintSet,
+    bridge::SpecifySetTypeBridge,
+)
     return bridge.set
 end
 

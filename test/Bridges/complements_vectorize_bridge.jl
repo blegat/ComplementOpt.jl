@@ -8,16 +8,26 @@ using MathOptComplements
             MathOptComplements.Bridges.ComplementsVectorizeBridge{Float64},
             model -> begin
                 x, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
-                y, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(3.0))
+                y, _ = MOI.add_constrained_variable(
+                    model,
+                    MOI.GreaterThan(3.0),
+                )
                 MOI.add_constraint(
                     model,
                     MOI.VectorOfVariables([x, y]),
-                    MathOptComplements.ComplementsWithSetType{MOI.GreaterThan{Float64}}(2),
+                    MathOptComplements.ComplementsWithSetType{
+                        MOI.GreaterThan{Float64},
+                    }(
+                        2,
+                    ),
                 )
             end,
             model -> begin
                 x, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
-                y, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(3.0))
+                y, _ = MOI.add_constrained_variable(
+                    model,
+                    MOI.GreaterThan(3.0),
+                )
                 f = MOI.VectorAffineFunction{Float64}(
                     [
                         MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(1.0, x)),
@@ -28,7 +38,9 @@ using MathOptComplements
                 MOI.add_constraint(
                     model,
                     f,
-                    MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}(2),
+                    MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}(
+                        2,
+                    ),
                 )
             end;
             cannot_unbridge = true,
@@ -40,16 +52,22 @@ using MathOptComplements
             MathOptComplements.Bridges.ComplementsVectorizeBridge{Float64},
             model -> begin
                 x, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
-                y, _ = MOI.add_constrained_variable(model, MOI.LessThan(-2.0))
+                y, _ =
+                    MOI.add_constrained_variable(model, MOI.LessThan(-2.0))
                 MOI.add_constraint(
                     model,
                     MOI.VectorOfVariables([x, y]),
-                    MathOptComplements.ComplementsWithSetType{MOI.LessThan{Float64}}(2),
+                    MathOptComplements.ComplementsWithSetType{
+                        MOI.LessThan{Float64},
+                    }(
+                        2,
+                    ),
                 )
             end,
             model -> begin
                 x, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
-                y, _ = MOI.add_constrained_variable(model, MOI.LessThan(-2.0))
+                y, _ =
+                    MOI.add_constrained_variable(model, MOI.LessThan(-2.0))
                 f = MOI.VectorAffineFunction{Float64}(
                     [
                         MOI.VectorAffineTerm(1, MOI.ScalarAffineTerm(1.0, x)),
@@ -60,7 +78,9 @@ using MathOptComplements
                 MOI.add_constraint(
                     model,
                     f,
-                    MathOptComplements.ComplementsWithSetType{MOI.Nonpositives}(2),
+                    MathOptComplements.ComplementsWithSetType{MOI.Nonpositives}(
+                        2,
+                    ),
                 )
             end;
             cannot_unbridge = true,
@@ -72,16 +92,22 @@ using MathOptComplements
             MathOptComplements.Bridges.ComplementsVectorizeBridge{Float64},
             model -> begin
                 x, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
-                y, _ = MOI.add_constrained_variable(model, MOI.EqualTo(2.0))
+                y, _ =
+                    MOI.add_constrained_variable(model, MOI.EqualTo(2.0))
                 MOI.add_constraint(
                     model,
                     MOI.VectorOfVariables([x, y]),
-                    MathOptComplements.ComplementsWithSetType{MOI.EqualTo{Float64}}(2),
+                    MathOptComplements.ComplementsWithSetType{
+                        MOI.EqualTo{Float64},
+                    }(
+                        2,
+                    ),
                 )
             end,
             model -> begin
                 x, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
-                y, _ = MOI.add_constrained_variable(model, MOI.EqualTo(2.0))
+                y, _ =
+                    MOI.add_constrained_variable(model, MOI.EqualTo(2.0))
                 f = MOIU.operate(vcat, Float64, 1.0 * x, 1.0 * y - 2.0)
                 MOI.add_constraint(
                     model,

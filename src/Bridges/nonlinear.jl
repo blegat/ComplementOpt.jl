@@ -42,7 +42,9 @@ function MOI.Bridges.Constraint.bridge_constraint(
     # Only `MathOptComplements.Optimizer` supports setting custom bridge arguments
     # so the default will be used when the bridge is added for instance to
     # `MOI.Bridges.LazyBridgeOptimizer`
-    reformulation::AbstractComplementarityRelaxation = ScholtesRelaxation(zero(T)),
+    reformulation::AbstractComplementarityRelaxation = ScholtesRelaxation(
+        zero(T),
+    ),
 ) where {T,S}
     # Delay reformulation until `final_touch` so that per-constraint
     # `ComplementarityReformulation` attributes can override it first.
@@ -65,8 +67,13 @@ function MOI.Bridges.Constraint.concrete_bridge_type(
     return NonlinearBridge{T,S}
 end
 
-MOI.supports(::MOI.ModelLike, ::ComplementarityReformulation, ::Type{<:NonlinearBridge}) =
-    true
+function MOI.supports(
+    ::MOI.ModelLike,
+    ::ComplementarityReformulation,
+    ::Type{<:NonlinearBridge},
+)
+    return true
+end
 
 function MOI.set(
     model::MOI.ModelLike,
@@ -93,11 +100,17 @@ function MOI.Bridges.added_constraint_types(::Type{<:NonlinearBridge})
     return Tuple{Type,Type}[]
 end
 
-function MOI.get(bridge::NonlinearBridge, ::MOI.NumberOfConstraints{F,S})::Int64 where {F,S}
+function MOI.get(
+    bridge::NonlinearBridge,
+    ::MOI.NumberOfConstraints{F,S},
+)::Int64 where {F,S}
     return count(ci -> ci isa MOI.ConstraintIndex{F,S}, bridge.constraints)
 end
 
-function MOI.get(bridge::NonlinearBridge, ::MOI.ListOfConstraintIndices{F,S}) where {F,S}
+function MOI.get(
+    bridge::NonlinearBridge,
+    ::MOI.ListOfConstraintIndices{F,S},
+) where {F,S}
     return MOI.ConstraintIndex{F,S}[
         ci for ci in bridge.constraints if ci isa MOI.ConstraintIndex{F,S}
     ]
@@ -129,19 +142,52 @@ function MOI.Bridges.final_touch(bridge::NonlinearBridge, model::MOI.ModelLike)
 end
 
 # Bound helpers: extract the relevant bounds based on the set type S.
-_complementarity_bounds(::Type{MOI.Nonnegatives}, model, ::Type{T}, x2) where {T} =
-    (zero(T), T(Inf))
-_complementarity_bounds(::Type{MOI.Nonpositives}, model, ::Type{T}, x2) where {T} =
-    (T(-Inf), zero(T))
-_complementarity_bounds(::Type{MOI.Zeros}, model, ::Type{T}, x2) where {T} =
-    (zero(T), zero(T))
-function _complementarity_bounds(::Type{<:MOI.GreaterThan}, model, ::Type{T}, x2) where {T}
+function _complementarity_bounds(
+    ::Type{MOI.Nonnegatives},
+    model,
+    ::Type{T},
+    x2,
+) where {T}
+    return (zero(T), T(Inf))
+end
+function _complementarity_bounds(
+    ::Type{MOI.Nonpositives},
+    model,
+    ::Type{T},
+    x2,
+) where {T}
+    return (T(-Inf), zero(T))
+end
+function _complementarity_bounds(
+    ::Type{MOI.Zeros},
+    model,
+    ::Type{T},
+    x2,
+) where {T}
+    return (zero(T), zero(T))
+end
+function _complementarity_bounds(
+    ::Type{<:MOI.GreaterThan},
+    model,
+    ::Type{T},
+    x2,
+) where {T}
     return (MOIU.get_bounds(model, T, x2)[1], T(Inf))
 end
-function _complementarity_bounds(::Type{<:MOI.LessThan}, model, ::Type{T}, x2) where {T}
+function _complementarity_bounds(
+    ::Type{<:MOI.LessThan},
+    model,
+    ::Type{T},
+    x2,
+) where {T}
     return (T(-Inf), MOIU.get_bounds(model, T, x2)[2])
 end
-function _complementarity_bounds(::Type{<:MOI.Interval}, model, ::Type{T}, x2) where {T}
+function _complementarity_bounds(
+    ::Type{<:MOI.Interval},
+    model,
+    ::Type{T},
+    x2,
+) where {T}
     return MOIU.get_bounds(model, T, x2)
 end
 
@@ -165,17 +211,37 @@ function reformulate_as_nonlinear_program!(
         x2 = fun.variables[cc+n_comp]
         lb2, ub2 = _complementarity_bounds(S, model, Float64, x2)
         if isinf(ub2)
-            idc = _relax_complementarity_lower_bound!(model, relaxation, x1, x2, lb2, ub2)
+            idc = _relax_complementarity_lower_bound!(
+                model,
+                relaxation,
+                x1,
+                x2,
+                lb2,
+                ub2,
+            )
         elseif isinf(lb2)
-            idc = _relax_complementarity_upper_bound!(model, relaxation, x1, x2, lb2, ub2)
+            idc = _relax_complementarity_upper_bound!(
+                model,
+                relaxation,
+                x1,
+                x2,
+                lb2,
+                ub2,
+            )
         else
-            idc = _relax_complementarity_range!(model, relaxation, x1, x2, lb2, ub2)
+            idc = _relax_complementarity_range!(
+                model,
+                relaxation,
+                x1,
+                x2,
+                lb2,
+                ub2,
+            )
         end
         append!(ind_cc, idc)
     end
     return ind_cc
 end
-
 
 """
     ScholtesRelaxation <: AbstractComplementarityRelaxation
@@ -211,7 +277,8 @@ function _relax_complementarity_lower_bound!(
         @assert lb1 == 0.0 # ensure we follow MOI's convention
         # TODO: what should we do if ub1 is finite?
     end
-    idc = MOI.add_constraint(model, x1 * (x2 - lb2), MOI.LessThan(relaxation.tau))
+    idc =
+        MOI.add_constraint(model, x1 * (x2 - lb2), MOI.LessThan(relaxation.tau))
     return [idc]
 end
 
@@ -231,7 +298,8 @@ function _relax_complementarity_upper_bound!(
         @assert ub1 == 0.0 # ensure we follow MOI's convention
         # TODO: what should we do if lb1 is finite?
     end
-    idc = MOI.add_constraint(model, x1 * (x2 - ub2), MOI.LessThan(relaxation.tau))
+    idc =
+        MOI.add_constraint(model, x1 * (x2 - ub2), MOI.LessThan(relaxation.tau))
     return [idc]
 end
 
@@ -244,8 +312,10 @@ function _relax_complementarity_range!(
     lb2,
     ub2,
 )
-    idc1 = MOI.add_constraint(model, x1 * (x2 - lb2), MOI.LessThan(relaxation.tau))
-    idc2 = MOI.add_constraint(model, x1 * (x2 - ub2), MOI.LessThan(relaxation.tau))
+    idc1 =
+        MOI.add_constraint(model, x1 * (x2 - lb2), MOI.LessThan(relaxation.tau))
+    idc2 =
+        MOI.add_constraint(model, x1 * (x2 - ub2), MOI.LessThan(relaxation.tau))
     return [idc1, idc2]
 end
 
@@ -356,7 +426,6 @@ function _relax_complementarity_range!(
     return [idc1, idc2]
 end
 
-
 """
     LiuFukushimaRelaxation <: AbstractComplementarityRelaxation
 
@@ -384,7 +453,11 @@ function _relax_complementarity_lower_bound!(
     lb1, _ = MOIU.get_bounds(model, Float64, x1)
     @assert isinf(lb1) || iszero(lb1)
 
-    idc1 = MOI.add_constraint(model, x1 * (x2 - lb2), MOI.LessThan(relaxation.epsilon^2))
+    idc1 = MOI.add_constraint(
+        model,
+        x1 * (x2 - lb2),
+        MOI.LessThan(relaxation.epsilon^2),
+    )
     idc2 = MOI.add_constraint(
         model,
         (x1 + relaxation.epsilon) * (x2 - lb2 + relaxation.epsilon),
@@ -393,7 +466,9 @@ function _relax_complementarity_lower_bound!(
 
     # Remove bounds
     _remove_bounds!(model, x1)
-    cidx = MOI.ConstraintIndex{MOI.VariableIndex,MOI.GreaterThan{Float64}}(x2.value)
+    cidx = MOI.ConstraintIndex{MOI.VariableIndex,MOI.GreaterThan{Float64}}(
+        x2.value,
+    )
     MOI.delete(model, cidx)
 
     return [idc1, idc2]
@@ -411,7 +486,11 @@ function _relax_complementarity_upper_bound!(
     _, ub1 = MOIU.get_bounds(model, Float64, x1)
     @assert isinf(ub1) || iszero(ub1)
 
-    idc1 = MOI.add_constraint(model, x1 * (x2 - ub2), MOI.LessThan(relaxation.epsilon^2))
+    idc1 = MOI.add_constraint(
+        model,
+        x1 * (x2 - ub2),
+        MOI.LessThan(relaxation.epsilon^2),
+    )
     idc2 = MOI.add_constraint(
         model,
         (x1 - relaxation.epsilon) * (x2 - ub2 - relaxation.epsilon),
@@ -420,12 +499,12 @@ function _relax_complementarity_upper_bound!(
 
     # Remove bounds
     _remove_bounds!(model, x1)
-    cidx = MOI.ConstraintIndex{MOI.VariableIndex,MOI.LessThan{Float64}}(x2.value)
+    cidx =
+        MOI.ConstraintIndex{MOI.VariableIndex,MOI.LessThan{Float64}}(x2.value)
     MOI.delete(model, cidx)
 
     return [idc1, idc2]
 end
-
 
 """
     KanzowSchwarzRelaxation <: AbstractComplementarityRelaxation

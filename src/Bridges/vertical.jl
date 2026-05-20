@@ -26,7 +26,8 @@ to an equality constraint instead.
   * [`MOI.ScalarAffineFunction{T}`](@ref) in [`MOI.EqualTo{T}`](@ref)
 
 """
-struct VerticalBridge{T,S<:MOI.AbstractVectorSet} <: MOI.Bridges.Constraint.AbstractBridge
+struct VerticalBridge{T,S<:MOI.AbstractVectorSet} <:
+       MOI.Bridges.Constraint.AbstractBridge
     constraint::MOI.ConstraintIndex{MOI.VectorOfVariables,S}
     equalities::Vector{MOI.ConstraintIndex}
     slacks::Vector{MOI.VariableIndex}
@@ -90,7 +91,9 @@ function MOI.Bridges.added_constrained_variable_types(::Type{<:VerticalBridge})
     return Tuple{Type}[(MOI.Reals,)]
 end
 
-function MOI.Bridges.added_constraint_types(::Type{VerticalBridge{T,S}}) where {T,S}
+function MOI.Bridges.added_constraint_types(
+    ::Type{VerticalBridge{T,S}},
+) where {T,S}
     return Tuple{Type,Type}[
         (MOI.VectorOfVariables, S),
         (MOI.ScalarAffineFunction{T}, MOI.EqualTo{T}),
@@ -124,7 +127,9 @@ function MOI.get(
     ::MOI.NumberOfConstraints{MOI.ScalarAffineFunction{T},MOI.EqualTo{T}},
 )::Int64 where {T}
     return count(
-        ci -> ci isa MOI.ConstraintIndex{MOI.ScalarAffineFunction{T},MOI.EqualTo{T}},
+        ci ->
+            ci isa
+            MOI.ConstraintIndex{MOI.ScalarAffineFunction{T},MOI.EqualTo{T}},
         bridge.equalities,
     )
 end
@@ -150,8 +155,13 @@ function MOI.delete(model::MOI.ModelLike, bridge::VerticalBridge)
     return
 end
 
-MOI.supports(::MOI.ModelLike, ::ComplementarityReformulation, ::Type{<:VerticalBridge}) =
-    true
+function MOI.supports(
+    ::MOI.ModelLike,
+    ::ComplementarityReformulation,
+    ::Type{<:VerticalBridge},
+)
+    return true
+end
 
 function MOI.set(
     model::MOI.ModelLike,
@@ -181,15 +191,19 @@ function _is_single_variable(func::MOI.ScalarQuadraticFunction)
     )
 end
 function _is_single_variable(func::MOI.ScalarNonlinearFunction)
-    return func.head == :+ && length(func.args) == 1 && isa(func.args[1], MOI.VariableIndex)
+    return func.head == :+ &&
+           length(func.args) == 1 &&
+           isa(func.args[1], MOI.VariableIndex)
 end
 _get_variable(func::MOI.ScalarAffineFunction) = func.terms[1].variable
 _get_variable(func::MOI.ScalarQuadraticFunction) = func.affine_terms[1].variable
 _get_variable(func::MOI.ScalarNonlinearFunction) = func.args[1]
 
-
 # TODO: add support for ScalarNonlinearTerm
-function _parse_complementarity_constraint(fun::MOI.AbstractVectorFunction, n_comp)
+function _parse_complementarity_constraint(
+    fun::MOI.AbstractVectorFunction,
+    n_comp,
+)
     exprs = MOIU.scalarize(fun)
     @assert length(exprs) == 2*n_comp
 
@@ -233,7 +247,12 @@ the generated equality constraints.
 Once reformulated, the complementarity constraints involve only single variables.
 
 """
-function reformulate_to_vertical!(model::MOI.ModelLike, ::Type{T}, fun, set) where {T}
+function reformulate_to_vertical!(
+    model::MOI.ModelLike,
+    ::Type{T},
+    fun,
+    set,
+) where {T}
     equalities = MOI.ConstraintIndex[]
     slacks = MOI.VariableIndex[]
     ind_cc1, ind_cc2 = MOI.VariableIndex[], MOI.VariableIndex[]
@@ -249,7 +268,11 @@ function reformulate_to_vertical!(model::MOI.ModelLike, ::Type{T}, fun, set) whe
                 # If x2 is unbounded, the LHS is directly converted to an equality constraint.
                 push!(
                     equalities,
-                    MOIU.normalize_and_add_constraint(model, lhs, MOI.EqualTo{T}(zero(T))),
+                    MOIU.normalize_and_add_constraint(
+                        model,
+                        lhs,
+                        MOI.EqualTo{T}(zero(T)),
+                    ),
                 )
                 continue
             end
@@ -267,7 +290,11 @@ function reformulate_to_vertical!(model::MOI.ModelLike, ::Type{T}, fun, set) whe
             new_lhs = MOIU.operate!(-, T, lhs, x1)
             push!(
                 equalities,
-                MOIU.normalize_and_add_constraint(model, new_lhs, MOI.EqualTo{T}(zero(T))),
+                MOIU.normalize_and_add_constraint(
+                    model,
+                    new_lhs,
+                    MOI.EqualTo{T}(zero(T)),
+                ),
             )
             push!(ind_cc1, x1)
             push!(ind_cc2, x2)
