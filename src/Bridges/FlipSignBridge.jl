@@ -61,10 +61,10 @@ function MOI.Bridges.Constraint.bridge_constraint(
     set::ComplementsWithSetType{S1},
 ) where {T,F,S1,S2,G<:MOI.AbstractVectorFunction}
     @assert set.dimension == 2
-    scalars = MOIU.scalarize(func)
+    scalars = MOI.Utilities.scalarize(func)
     # Negate only the first component (the activity)
-    neg_x = MOIU.operate(-, T, scalars[1])
-    new_func = MOIU.operate(vcat, T, neg_x, scalars[2])
+    neg_x = MOI.Utilities.operate(-, T, scalars[1])
+    new_func = MOI.Utilities.operate(vcat, T, neg_x, scalars[2])
     ci = MOI.add_constraint(model, new_func, ComplementsWithSetType{S2}(2))
     return FlipSignBridge{T,F,S1,S2,G}(ci, func)
 end
@@ -82,8 +82,13 @@ function MOI.Bridges.Constraint.concrete_bridge_type(
     G::Type{<:MOI.AbstractVectorFunction},
     ::Type{ComplementsWithSetType{S1}},
 ) where {T,S1<:_FlippableSets}
-    H = MOIU.promote_operation(-, T, MOIU.scalar_type(G))
-    F = MOIU.promote_operation(vcat, T, H, MOIU.scalar_type(G))
+    H = MOI.Utilities.promote_operation(-, T, MOI.Utilities.scalar_type(G))
+    F = MOI.Utilities.promote_operation(
+        vcat,
+        T,
+        H,
+        MOI.Utilities.scalar_type(G),
+    )
     S2 = _flip_set_type(S1)
     return FlipSignBridge{T,F,S1,S2,G}
 end

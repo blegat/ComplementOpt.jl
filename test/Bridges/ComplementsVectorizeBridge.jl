@@ -113,7 +113,12 @@ using MathOptComplements
                 x, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
                 y, _ =
                     MOI.add_constrained_variable(model, MOI.EqualTo(2.0))
-                f = MOIU.operate(vcat, Float64, 1.0 * x, 1.0 * y - 2.0)
+                f = MOI.Utilities.operate(
+                    vcat,
+                    Float64,
+                    1.0 * x,
+                    1.0 * y - 2.0,
+                )
                 MOI.add_constraint(
                     model,
                     f,

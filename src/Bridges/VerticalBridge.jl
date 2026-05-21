@@ -209,7 +209,7 @@ function _parse_complementarity_constraint(
     fun::MOI.AbstractVectorFunction,
     n_comp,
 )
-    exprs = MOIU.scalarize(fun)
+    exprs = MOI.Utilities.scalarize(fun)
     @assert length(exprs) == 2*n_comp
 
     cc_lhs = MOI.AbstractScalarFunction[]
@@ -268,12 +268,12 @@ function reformulate_to_vertical!(
     for (lhs, x2) in zip(cc_lhs, cc_rhs)
         if set isa MOI.Complements
             # Check if x2 is bounded.
-            lb, ub = MOIU.get_bounds(model, T, x2)
+            lb, ub = MOI.Utilities.get_bounds(model, T, x2)
             if isinf(lb) && isinf(ub)
                 # If x2 is unbounded, the LHS is directly converted to an equality constraint.
                 push!(
                     equalities,
-                    MOIU.normalize_and_add_constraint(
+                    MOI.Utilities.normalize_and_add_constraint(
                         model,
                         lhs,
                         MOI.EqualTo{T}(zero(T)),
@@ -292,10 +292,10 @@ function reformulate_to_vertical!(
             # Else, reformulate LHS using vertical form
             x1 = MOI.add_variable(model)
             push!(slacks, x1)
-            new_lhs = MOIU.operate!(-, T, lhs, x1)
+            new_lhs = MOI.Utilities.operate!(-, T, lhs, x1)
             push!(
                 equalities,
-                MOIU.normalize_and_add_constraint(
+                MOI.Utilities.normalize_and_add_constraint(
                     model,
                     new_lhs,
                     MOI.EqualTo{T}(zero(T)),

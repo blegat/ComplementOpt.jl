@@ -66,7 +66,7 @@ function MOI.Bridges.Constraint.bridge_constraint(
     set::ComplementsWithSetType{MOI.Interval{T}},
 ) where {T,G,F<:MOI.AbstractVectorFunction}
     @assert set.dimension == 2
-    scalars = MOIU.scalarize(func)
+    scalars = MOI.Utilities.scalarize(func)
     x_func = scalars[1]  # activity (may be an expression)
     y = scalars[2]       # slack (must be a variable)
     # y must be a single variable
@@ -83,10 +83,13 @@ function MOI.Bridges.Constraint.bridge_constraint(
     xp, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(zero(T)))
     xn, _ = MOI.add_constrained_variable(model, MOI.LessThan(zero(T)))
     # x == xp + xn
-    eq_func = MOIU.operate(-, T, x_func, xp)
-    eq_func = MOIU.operate!(-, T, eq_func, xn)
-    equality =
-        MOIU.normalize_and_add_constraint(model, eq_func, MOI.EqualTo(zero(T)))
+    eq_func = MOI.Utilities.operate(-, T, x_func, xp)
+    eq_func = MOI.Utilities.operate!(-, T, eq_func, xn)
+    equality = MOI.Utilities.normalize_and_add_constraint(
+        model,
+        eq_func,
+        MOI.EqualTo(zero(T)),
+    )
     # [xp, y] in ComplementsWithSetType{GreaterThan{T}}
     lower = MOI.add_constraint(
         model,
@@ -123,9 +126,9 @@ function MOI.Bridges.Constraint.concrete_bridge_type(
     F::Type{<:MOI.AbstractVectorFunction},
     ::Type{ComplementsWithSetType{MOI.Interval{T}}},
 ) where {T}
-    G = MOIU.scalar_type(F)
+    G = MOI.Utilities.scalar_type(F)
     # After `operate(-, T, G, VariableIndex)`, the type may promote
-    H = MOIU.promote_operation(-, T, G, MOI.VariableIndex)
+    H = MOI.Utilities.promote_operation(-, T, G, MOI.VariableIndex)
     return SplitIntervalBridge{T,H,F}
 end
 

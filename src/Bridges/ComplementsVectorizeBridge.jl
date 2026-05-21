@@ -56,7 +56,7 @@ function _set_constant(
     ::ComplementsWithSetType{<:MOI.GreaterThan},
     x2,
 ) where {T}
-    return MOIU.get_bounds(model, T, x2)[1]
+    return MOI.Utilities.get_bounds(model, T, x2)[1]
 end
 function _set_constant(
     ::Type{T},
@@ -64,7 +64,7 @@ function _set_constant(
     ::ComplementsWithSetType{<:MOI.LessThan},
     x2,
 ) where {T}
-    return MOIU.get_bounds(model, T, x2)[2]
+    return MOI.Utilities.get_bounds(model, T, x2)[2]
 end
 function _set_constant(
     ::Type{T},
@@ -72,7 +72,7 @@ function _set_constant(
     ::ComplementsWithSetType{<:MOI.EqualTo},
     x2,
 ) where {T}
-    return MOIU.get_bounds(model, T, x2)[1]
+    return MOI.Utilities.get_bounds(model, T, x2)[1]
 end
 
 function MOI.Bridges.Constraint.bridge_constraint(
@@ -86,7 +86,7 @@ function MOI.Bridges.Constraint.bridge_constraint(
     x2 = func.variables[2]
     c = _set_constant(T, model, set, x2)
     # Shift only x2: [x1, x2] → [x1, x2 - c]
-    shifted = MOIU.operate(vcat, T, one(T) * x1, one(T) * x2 - c)
+    shifted = MOI.Utilities.operate(vcat, T, one(T) * x1, one(T) * x2 - c)
     ci = MOI.add_constraint(model, shifted, ComplementsWithSetType{SV}(2))
     return ComplementsVectorizeBridge{T,F,S,SV}(ci, c)
 end

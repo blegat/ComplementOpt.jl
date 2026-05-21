@@ -177,7 +177,7 @@ function _complementarity_bounds(
     ::Type{T},
     x2,
 ) where {T}
-    return (MOIU.get_bounds(model, T, x2)[1], T(Inf))
+    return (MOI.Utilities.get_bounds(model, T, x2)[1], T(Inf))
 end
 function _complementarity_bounds(
     ::Type{<:MOI.LessThan},
@@ -185,7 +185,7 @@ function _complementarity_bounds(
     ::Type{T},
     x2,
 ) where {T}
-    return (T(-Inf), MOIU.get_bounds(model, T, x2)[2])
+    return (T(-Inf), MOI.Utilities.get_bounds(model, T, x2)[2])
 end
 function _complementarity_bounds(
     ::Type{<:MOI.Interval},
@@ -193,7 +193,7 @@ function _complementarity_bounds(
     ::Type{T},
     x2,
 ) where {T}
-    return MOIU.get_bounds(model, T, x2)
+    return MOI.Utilities.get_bounds(model, T, x2)
 end
 
 """
@@ -275,7 +275,7 @@ function _relax_complementarity_lower_bound!(
     lb2,
     ub2,
 )
-    lb1, _ = MOIU.get_bounds(model, Float64, x1)
+    lb1, _ = MOI.Utilities.get_bounds(model, Float64, x1)
     if isinf(lb1)
         MOI.add_constraint(model, x1, MOI.GreaterThan(0.0))
     else
@@ -296,7 +296,7 @@ function _relax_complementarity_upper_bound!(
     lb2,
     ub2,
 )
-    _, ub1 = MOIU.get_bounds(model, Float64, x1)
+    _, ub1 = MOI.Utilities.get_bounds(model, Float64, x1)
     if isinf(ub1)
         MOI.add_constraint(model, x1, MOI.LessThan(0.0))
     else
@@ -369,7 +369,7 @@ function _relax_complementarity_lower_bound!(
     lb2,
     ub2,
 )
-    lb1, ub1 = MOIU.get_bounds(model, Float64, x1)
+    lb1, ub1 = MOI.Utilities.get_bounds(model, Float64, x1)
     if isinf(lb1)
         MOI.add_constraint(model, x1, MOI.GreaterThan(0.0))
     else
@@ -393,7 +393,7 @@ function _relax_complementarity_upper_bound!(
     lb2,
     ub2,
 )
-    lb1, ub1 = MOIU.get_bounds(model, Float64, x1)
+    lb1, ub1 = MOI.Utilities.get_bounds(model, Float64, x1)
     if isinf(ub1)
         MOI.add_constraint(model, x1, MOI.LessThan(0.0))
     else
@@ -417,7 +417,7 @@ function _relax_complementarity_range!(
     lb2,
     ub2,
 )
-    lb1, ub1 = MOIU.get_bounds(model, Float64, x1)
+    lb1, ub1 = MOI.Utilities.get_bounds(model, Float64, x1)
     idc1 = MOI.add_constraint(
         model,
         _min_eps(x1, x2 - lb2, relaxation.epsilon),
@@ -455,7 +455,7 @@ function _relax_complementarity_lower_bound!(
     ub2,
 )
     # Ensure we respect MOI's specs
-    lb1, _ = MOIU.get_bounds(model, Float64, x1)
+    lb1, _ = MOI.Utilities.get_bounds(model, Float64, x1)
     @assert isinf(lb1) || iszero(lb1)
 
     idc1 = MOI.add_constraint(
@@ -488,7 +488,7 @@ function _relax_complementarity_upper_bound!(
     ub2,
 )
     # Ensure we respect MOI's specs
-    _, ub1 = MOIU.get_bounds(model, Float64, x1)
+    _, ub1 = MOI.Utilities.get_bounds(model, Float64, x1)
     @assert isinf(ub1) || iszero(ub1)
 
     idc1 = MOI.add_constraint(
@@ -553,7 +553,7 @@ function _relax_complementarity_lower_bound!(
     lb2,
     ub2,
 )
-    lb1, ub1 = MOIU.get_bounds(model, Float64, x1)
+    lb1, ub1 = MOI.Utilities.get_bounds(model, Float64, x1)
     if isinf(lb1)
         MOI.add_constraint(model, x1, MOI.GreaterThan(0.0))
     else
@@ -577,7 +577,7 @@ function _relax_complementarity_upper_bound!(
     lb2,
     ub2,
 )
-    lb1, ub1 = MOIU.get_bounds(model, Float64, x1)
+    lb1, ub1 = MOI.Utilities.get_bounds(model, Float64, x1)
     if isinf(ub1)
         MOI.add_constraint(model, x1, MOI.LessThan(0.0))
     else

@@ -128,7 +128,7 @@ function MOI.Bridges.final_touch(
 end
 
 function _specify_set_type_pair!(model, ::Type{T}, x1, x2, bounds) where {T}
-    lb2, ub2 = MOIU.get_bounds(model, T, x2)
+    lb2, ub2 = MOI.Utilities.get_bounds(model, T, x2)
     if !isinf(lb2) && isinf(ub2)
         return _specify_lower_bound!(model, T, x1, x2, lb2, bounds)
     elseif isinf(lb2) && !isinf(ub2)
@@ -150,7 +150,7 @@ function _specify_set_type_pair!(model, ::Type{T}, x1, x2, bounds) where {T}
 end
 
 function _specify_lower_bound!(model, ::Type{T}, x1, x2, lb2, bounds) where {T}
-    lb1, _ = MOIU.get_bounds(model, T, x1)
+    lb1, _ = MOI.Utilities.get_bounds(model, T, x1)
     if isinf(lb1)
         push!(bounds, MOI.add_constraint(model, x1, MOI.GreaterThan(zero(T))))
     end
@@ -163,7 +163,7 @@ function _specify_lower_bound!(model, ::Type{T}, x1, x2, lb2, bounds) where {T}
 end
 
 function _specify_upper_bound!(model, ::Type{T}, x1, x2, ub2, bounds) where {T}
-    _, ub1 = MOIU.get_bounds(model, T, x1)
+    _, ub1 = MOI.Utilities.get_bounds(model, T, x1)
     if isinf(ub1)
         push!(bounds, MOI.add_constraint(model, x1, MOI.LessThan(zero(T))))
     end

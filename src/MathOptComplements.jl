@@ -6,7 +6,6 @@
 module MathOptComplements
 
 import MathOptInterface as MOI
-const MOIU = MOI.Utilities
 
 include("utils.jl")
 include("attributes.jl")
