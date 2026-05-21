@@ -187,6 +187,7 @@ function _is_single_variable(func::MOI.ScalarAffineFunction)
            func.terms[1].coefficient == 1.0 &&
            iszero(func.constant)
 end
+
 function _is_single_variable(func::MOI.ScalarQuadraticFunction)
     return (
         length(func.quadratic_terms) == 0 &&
@@ -195,13 +196,17 @@ function _is_single_variable(func::MOI.ScalarQuadraticFunction)
         iszero(func.constant)
     )
 end
+
 function _is_single_variable(func::MOI.ScalarNonlinearFunction)
     return func.head == :+ &&
            length(func.args) == 1 &&
            isa(func.args[1], MOI.VariableIndex)
 end
+
 _get_variable(func::MOI.ScalarAffineFunction) = func.terms[1].variable
+
 _get_variable(func::MOI.ScalarQuadraticFunction) = func.affine_terms[1].variable
+
 _get_variable(func::MOI.ScalarNonlinearFunction) = func.args[1]
 
 # TODO: add support for ScalarNonlinearTerm
@@ -211,10 +216,8 @@ function _parse_complementarity_constraint(
 )
     exprs = MOI.Utilities.scalarize(fun)
     @assert length(exprs) == 2*n_comp
-
     cc_lhs = MOI.AbstractScalarFunction[]
     cc_rhs = MOI.VariableIndex[]
-
     for i in 1:n_comp
         # Parse LHS
         t1 = exprs[i]
@@ -224,7 +227,6 @@ function _parse_complementarity_constraint(
         else
             push!(cc_lhs, t1)
         end
-
         # Parse RHS
         isvar2 = _is_single_variable(t2)
         if !isvar2
@@ -237,7 +239,6 @@ function _parse_complementarity_constraint(
         end
         push!(cc_rhs, _get_variable(t2))
     end
-
     return cc_lhs, cc_rhs
 end
 
@@ -250,7 +251,6 @@ expressions are rewritten with a slack. `T` is the coefficient type used for
 the generated equality constraints.
 
 Once reformulated, the complementarity constraints involve only single variables.
-
 """
 function reformulate_to_vertical!(
     model::MOI.ModelLike,

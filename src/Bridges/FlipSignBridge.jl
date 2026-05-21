@@ -38,18 +38,13 @@ struct FlipSignBridge{T,F,S1,S2,G} <: MOI.Bridges.Constraint.AbstractBridge
     original_func::G
 end
 
-function _flip_set_type(::Type{MOI.Nonnegatives})
-    return MOI.Nonpositives
-end
-function _flip_set_type(::Type{MOI.Nonpositives})
-    return MOI.Nonnegatives
-end
-function _flip_set_type(::Type{MOI.GreaterThan{T}}) where {T}
-    return MOI.LessThan{T}
-end
-function _flip_set_type(::Type{MOI.LessThan{T}}) where {T}
-    return MOI.GreaterThan{T}
-end
+_flip_set_type(::Type{MOI.Nonnegatives}) = MOI.Nonpositives
+
+_flip_set_type(::Type{MOI.Nonpositives}) = MOI.Nonnegatives
+
+_flip_set_type(::Type{MOI.GreaterThan{T}}) where {T} = MOI.LessThan{T}
+
+_flip_set_type(::Type{MOI.LessThan{T}}) where {T} = MOI.GreaterThan{T}
 
 const _FlippableSets =
     Union{MOI.Nonnegatives,MOI.Nonpositives,MOI.GreaterThan,MOI.LessThan}

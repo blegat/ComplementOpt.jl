@@ -40,15 +40,11 @@ struct ComplementsVectorizeBridge{T,F,S,SV} <:
     set_constant::T
 end
 
-function _vector_set_type(::Type{<:MOI.GreaterThan})
-    return MOI.Nonnegatives
-end
-function _vector_set_type(::Type{<:MOI.LessThan})
-    return MOI.Nonpositives
-end
-function _vector_set_type(::Type{<:MOI.EqualTo})
-    return MOI.Zeros
-end
+_vector_set_type(::Type{<:MOI.GreaterThan}) = MOI.Nonnegatives
+
+_vector_set_type(::Type{<:MOI.LessThan}) = MOI.Nonpositives
+
+_vector_set_type(::Type{<:MOI.EqualTo}) = MOI.Zeros
 
 function _set_constant(
     ::Type{T},
@@ -58,6 +54,7 @@ function _set_constant(
 ) where {T}
     return MOI.Utilities.get_bounds(model, T, x2)[1]
 end
+
 function _set_constant(
     ::Type{T},
     model,
@@ -66,6 +63,7 @@ function _set_constant(
 ) where {T}
     return MOI.Utilities.get_bounds(model, T, x2)[2]
 end
+
 function _set_constant(
     ::Type{T},
     model,
@@ -94,12 +92,8 @@ end
 function MOI.supports_constraint(
     ::Type{<:ComplementsVectorizeBridge},
     ::Type{MOI.VectorOfVariables},
-    ::Type{
-        <:ComplementsWithSetType{
-            <:Union{MOI.GreaterThan,MOI.LessThan,MOI.EqualTo},
-        },
-    },
-)
+    ::Type{ComplementsWithSetType{S}},
+) where {S<:Union{MOI.GreaterThan,MOI.LessThan,MOI.EqualTo}}
     return true
 end
 
