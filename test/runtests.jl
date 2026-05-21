@@ -853,4 +853,8 @@ end
     @test value(y) ≈ -1.0 atol = 1e-7
 end
 
-include(joinpath(@__DIR__, "Bridges", "runtests.jl"))
+is_test(f) = startswith(f, "test_") && endswith(f, ".jl")
+
+@testset "$file" for file in filter(is_test, readdir("Bridges"))
+    include(joinpath(@__DIR__, "Bridges", file))
+end
