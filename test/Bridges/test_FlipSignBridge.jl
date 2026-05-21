@@ -9,6 +9,8 @@ using Test
 import MathOptComplements
 import MathOptInterface as MOI
 
+const M = "TestFlipSignBridge.MathOptComplements"
+
 function runtests()
     is_test(name) = startswith("$name", "test_")
     @testset "$name" for name in filter(is_test, names(@__MODULE__; all = true))
@@ -20,27 +22,18 @@ end
 function test_Nonnegatives_Nonpositives()
     MOI.Bridges.runtests(
         MathOptComplements.Bridges.FlipSignBridge,
-        model -> begin
-            x, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
-            y, _ =
-                MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
-            MOI.add_constraint(
-                model,
-                MOI.VectorOfVariables([x, y]),
-                MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}(2),
-            )
-        end,
-        model -> begin
-            x, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
-            y, _ =
-                MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
-            f = MOI.Utilities.operate(vcat, Float64, -1.0 * x, 1.0 * y)
-            MOI.add_constraint(
-                model,
-                f,
-                MathOptComplements.ComplementsWithSetType{MOI.Nonpositives}(2),
-            )
-        end;
+        """
+        variables: x, y
+        x >= 0.0
+        y >= 0.0
+        [x, y] in $M.ComplementsWithSetType{MOI.Nonnegatives}(2)
+        """,
+        """
+        variables: x, y
+        x >= 0.0
+        y >= 0.0
+        [-1.0 * x, y] in $M.ComplementsWithSetType{MOI.Nonpositives}(2)
+        """;
         cannot_unbridge = true,
     )
     return
@@ -49,25 +42,18 @@ end
 function test_Nonpositives_Nonnegatives()
     MOI.Bridges.runtests(
         MathOptComplements.Bridges.FlipSignBridge,
-        model -> begin
-            x, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
-            y, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
-            MOI.add_constraint(
-                model,
-                MOI.VectorOfVariables([x, y]),
-                MathOptComplements.ComplementsWithSetType{MOI.Nonpositives}(2),
-            )
-        end,
-        model -> begin
-            x, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
-            y, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
-            f = MOI.Utilities.operate(vcat, Float64, -1.0 * x, 1.0 * y)
-            MOI.add_constraint(
-                model,
-                f,
-                MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}(2),
-            )
-        end;
+        """
+        variables: x, y
+        x <= 0.0
+        y <= 0.0
+        [x, y] in $M.ComplementsWithSetType{MOI.Nonpositives}(2)
+        """,
+        """
+        variables: x, y
+        x <= 0.0
+        y <= 0.0
+        [-1.0 * x, y] in $M.ComplementsWithSetType{MOI.Nonnegatives}(2)
+        """;
         cannot_unbridge = true,
     )
     return
@@ -76,33 +62,18 @@ end
 function test_GreaterThan_LessThan()
     MOI.Bridges.runtests(
         MathOptComplements.Bridges.FlipSignBridge,
-        model -> begin
-            x, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
-            y, _ =
-                MOI.add_constrained_variable(model, MOI.GreaterThan(3.0))
-            MOI.add_constraint(
-                model,
-                MOI.VectorOfVariables([x, y]),
-                MathOptComplements.ComplementsWithSetType{
-                    MOI.GreaterThan{Float64},
-                }(
-                    2,
-                ),
-            )
-        end,
-        model -> begin
-            x, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
-            y, _ =
-                MOI.add_constrained_variable(model, MOI.GreaterThan(3.0))
-            f = MOI.Utilities.operate(vcat, Float64, -1.0 * x, 1.0 * y)
-            MOI.add_constraint(
-                model,
-                f,
-                MathOptComplements.ComplementsWithSetType{MOI.LessThan{Float64}}(
-                    2,
-                ),
-            )
-        end;
+        """
+        variables: x, y
+        x >= 0.0
+        y >= 3.0
+        [x, y] in $M.ComplementsWithSetType{MOI.GreaterThan{Float64}}(2)
+        """,
+        """
+        variables: x, y
+        x >= 0.0
+        y >= 3.0
+        [-1.0 * x, y] in $M.ComplementsWithSetType{MOI.LessThan{Float64}}(2)
+        """;
         cannot_unbridge = true,
     )
     return
@@ -111,31 +82,18 @@ end
 function test_LessThan_GreaterThan()
     MOI.Bridges.runtests(
         MathOptComplements.Bridges.FlipSignBridge,
-        model -> begin
-            x, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
-            y, _ = MOI.add_constrained_variable(model, MOI.LessThan(-2.0))
-            MOI.add_constraint(
-                model,
-                MOI.VectorOfVariables([x, y]),
-                MathOptComplements.ComplementsWithSetType{MOI.LessThan{Float64}}(
-                    2,
-                ),
-            )
-        end,
-        model -> begin
-            x, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
-            y, _ = MOI.add_constrained_variable(model, MOI.LessThan(-2.0))
-            f = MOI.Utilities.operate(vcat, Float64, -1.0 * x, 1.0 * y)
-            MOI.add_constraint(
-                model,
-                f,
-                MathOptComplements.ComplementsWithSetType{
-                    MOI.GreaterThan{Float64},
-                }(
-                    2,
-                ),
-            )
-        end;
+        """
+        variables: x, y
+        x <= 0.0
+        y <= -2.0
+        [x, y] in $M.ComplementsWithSetType{MOI.LessThan{Float64}}(2)
+        """,
+        """
+        variables: x, y
+        x <= 0.0
+        y <= -2.0
+        [-1.0 * x, y] in $M.ComplementsWithSetType{MOI.GreaterThan{Float64}}(2)
+        """;
         cannot_unbridge = true,
     )
     return

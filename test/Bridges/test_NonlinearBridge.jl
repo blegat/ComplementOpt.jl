@@ -10,6 +10,8 @@ using Test
 import MathOptComplements
 import MathOptInterface as MOI
 
+const M = "TestNonlinearBridge.MathOptComplements"
+
 function runtests()
     is_test(name) = startswith("$name", "test_")
     @testset "$name" for name in filter(is_test, names(@__MODULE__; all = true))
@@ -21,23 +23,18 @@ end
 function test_Nonnegatives_lower_bound()
     MOI.Bridges.runtests(
         MathOptComplements.Bridges.NonlinearBridge,
-        model -> begin
-            x1, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
-            x2, _ =
-                MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
-            MOI.add_constraint(
-                model,
-                MOI.VectorOfVariables([x1, x2]),
-                MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}(2),
-            )
-        end,
-        model -> begin
-            x1, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
-            x2, _ =
-                MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
-            # x1 * (x2 - 0) <= 0
-            MOI.add_constraint(model, x1 * (x2 - 0.0), MOI.LessThan(0.0))
-        end;
+        """
+        variables: x, y
+        x >= 0.0
+        y >= 0.0
+        [x, y] in $M.ComplementsWithSetType{MOI.Nonnegatives}(2)
+        """,
+        """
+        variables: x, y
+        x >= 0.0
+        y >= 0.0
+        1.0 * x * y <= 0.0
+        """;
         cannot_unbridge = true,
     )
     return
@@ -46,21 +43,18 @@ end
 function test_Nonpositives_upper_bound()
     MOI.Bridges.runtests(
         MathOptComplements.Bridges.NonlinearBridge,
-        model -> begin
-            x1, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
-            x2, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
-            MOI.add_constraint(
-                model,
-                MOI.VectorOfVariables([x1, x2]),
-                MathOptComplements.ComplementsWithSetType{MOI.Nonpositives}(2),
-            )
-        end,
-        model -> begin
-            x1, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
-            x2, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
-            # x1 * (x2 - 0) <= 0
-            MOI.add_constraint(model, x1 * (x2 - 0.0), MOI.LessThan(0.0))
-        end;
+        """
+        variables: x, y
+        x <= 0.0
+        y <= 0.0
+        [x, y] in $M.ComplementsWithSetType{MOI.Nonpositives}(2)
+        """,
+        """
+        variables: x, y
+        x <= 0.0
+        y <= 0.0
+        1.0 * x * y <= 0.0
+        """;
         cannot_unbridge = true,
     )
     return
@@ -69,27 +63,18 @@ end
 function test_GreaterThan_with_nonzero_bound()
     MOI.Bridges.runtests(
         MathOptComplements.Bridges.NonlinearBridge,
-        model -> begin
-            x1, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
-            x2, _ =
-                MOI.add_constrained_variable(model, MOI.GreaterThan(3.0))
-            MOI.add_constraint(
-                model,
-                MOI.VectorOfVariables([x1, x2]),
-                MathOptComplements.ComplementsWithSetType{
-                    MOI.GreaterThan{Float64},
-                }(
-                    2,
-                ),
-            )
-        end,
-        model -> begin
-            x1, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
-            x2, _ =
-                MOI.add_constrained_variable(model, MOI.GreaterThan(3.0))
-            # x1 * (x2 - 3) <= 0
-            MOI.add_constraint(model, x1 * (x2 - 3.0), MOI.LessThan(0.0))
-        end;
+        """
+        variables: x, y
+        x >= 0.0
+        y >= 3.0
+        [x, y] in $M.ComplementsWithSetType{MOI.GreaterThan{Float64}}(2)
+        """,
+        """
+        variables: x, y
+        x >= 0.0
+        y >= 3.0
+        1.0 * x * y + -3.0 * x <= 0.0
+        """;
         cannot_unbridge = true,
     )
     return
@@ -97,11 +82,8 @@ end
 
 function test_Nonnegatives_with_unbounded_x1_lower_bound()
     inner = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
-    model = MOI.Bridges.Constraint.SingleBridgeOptimizer{
-        MathOptComplements.Bridges.NonlinearBridge{Float64},
-    }(
-        inner,
-    )
+    B = MathOptComplements.Bridges.NonlinearBridge{Float64}
+    model = MOI.Bridges.Constraint.SingleBridgeOptimizer{B}(inner)
     x1 = MOI.add_variable(model)
     x2, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
     MOI.add_constraint(
@@ -120,11 +102,8 @@ end
 
 function test_Nonpositives_with_unbounded_x1_upper_bound()
     inner = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
-    model = MOI.Bridges.Constraint.SingleBridgeOptimizer{
-        MathOptComplements.Bridges.NonlinearBridge{Float64},
-    }(
-        inner,
-    )
+    B = MathOptComplements.Bridges.NonlinearBridge{Float64}
+    model = MOI.Bridges.Constraint.SingleBridgeOptimizer{B}(inner)
     x1 = MOI.add_variable(model)
     x2, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
     MOI.add_constraint(
@@ -144,23 +123,18 @@ end
 function test_LessThan_with_nonzero_bound()
     MOI.Bridges.runtests(
         MathOptComplements.Bridges.NonlinearBridge,
-        model -> begin
-            x1, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
-            x2, _ = MOI.add_constrained_variable(model, MOI.LessThan(-2.0))
-            MOI.add_constraint(
-                model,
-                MOI.VectorOfVariables([x1, x2]),
-                MathOptComplements.ComplementsWithSetType{MOI.LessThan{Float64}}(
-                    2,
-                ),
-            )
-        end,
-        model -> begin
-            x1, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
-            x2, _ = MOI.add_constrained_variable(model, MOI.LessThan(-2.0))
-            # x1 * (x2 - (-2)) <= 0
-            MOI.add_constraint(model, x1 * (x2 + 2.0), MOI.LessThan(0.0))
-        end;
+        """
+        variables: x, y
+        x <= 0.0
+        y <= -2.0
+        [x, y] in $M.ComplementsWithSetType{MOI.LessThan{Float64}}(2)
+        """,
+        """
+        variables: x, y
+        x <= 0.0
+        y <= -2.0
+        1.0 * x * y + 2.0 * x <= 0.0
+        """;
         cannot_unbridge = true,
     )
     return
@@ -168,11 +142,8 @@ end
 
 function test_FB_Nonnegatives_with_unbounded_x1()
     inner = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
-    model = MOI.Bridges.Constraint.SingleBridgeOptimizer{
-        MathOptComplements.Bridges.NonlinearBridge{Float64},
-    }(
-        inner,
-    )
+    B = MathOptComplements.Bridges.NonlinearBridge{Float64}
+    model = MOI.Bridges.Constraint.SingleBridgeOptimizer{B}(inner)
     x1 = MOI.add_variable(model)
     x2, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
     ci = MOI.add_constraint(
@@ -199,11 +170,8 @@ end
 
 function test_FB_Nonpositives_with_unbounded_x1()
     inner = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
-    model = MOI.Bridges.Constraint.SingleBridgeOptimizer{
-        MathOptComplements.Bridges.NonlinearBridge{Float64},
-    }(
-        inner,
-    )
+    B = MathOptComplements.Bridges.NonlinearBridge{Float64}
+    model = MOI.Bridges.Constraint.SingleBridgeOptimizer{B}(inner)
     x1 = MOI.add_variable(model)
     x2, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
     ci = MOI.add_constraint(
@@ -230,11 +198,8 @@ end
 
 function test_KS_Nonnegatives_with_unbounded_x1()
     inner = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
-    model = MOI.Bridges.Constraint.SingleBridgeOptimizer{
-        MathOptComplements.Bridges.NonlinearBridge{Float64},
-    }(
-        inner,
-    )
+    B = MathOptComplements.Bridges.NonlinearBridge{Float64}
+    model = MOI.Bridges.Constraint.SingleBridgeOptimizer{B}(inner)
     x1 = MOI.add_variable(model)
     x2, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
     ci = MOI.add_constraint(
@@ -254,11 +219,8 @@ end
 
 function test_KS_Nonpositives_with_unbounded_x1()
     inner = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
-    model = MOI.Bridges.Constraint.SingleBridgeOptimizer{
-        MathOptComplements.Bridges.NonlinearBridge{Float64},
-    }(
-        inner,
-    )
+    B = MathOptComplements.Bridges.NonlinearBridge{Float64}
+    model = MOI.Bridges.Constraint.SingleBridgeOptimizer{B}(inner)
     x1 = MOI.add_variable(model)
     x2, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
     ci = MOI.add_constraint(
@@ -279,22 +241,15 @@ end
 function test_Zeros_equality()
     MOI.Bridges.runtests(
         MathOptComplements.Bridges.NonlinearBridge,
-        model -> begin
-            x1 = MOI.add_variable(model)
-            x2 = MOI.add_variable(model)
-            MOI.add_constraint(
-                model,
-                MOI.VectorOfVariables([x1, x2]),
-                MathOptComplements.ComplementsWithSetType{MOI.Zeros}(2),
-            )
-        end,
-        model -> begin
-            x1 = MOI.add_variable(model)
-            x2 = MOI.add_variable(model)
-            # Range relaxation with lb=0, ub=0: two constraints
-            MOI.add_constraint(model, x1 * (x2 - 0.0), MOI.LessThan(0.0))
-            MOI.add_constraint(model, x1 * (x2 - 0.0), MOI.LessThan(0.0))
-        end;
+        """
+        variables: x, y
+        [x, y] in $M.ComplementsWithSetType{MOI.Zeros}(2)
+        """,
+        """
+        variables: x, y
+        1.0 * x * y <= 0.0
+        1.0 * x * y <= 0.0
+        """;
         cannot_unbridge = true,
     )
     return
