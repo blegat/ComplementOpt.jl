@@ -13,13 +13,13 @@ using ..MathOptComplements:
     ComplementarityReformulation,
     _remove_bounds!
 
-include("vertical.jl")
-include("specify_set_type_bridge.jl")
-include("complements_vectorize_bridge.jl")
-include("split_interval_bridge.jl")
-include("flip_sign_bridge.jl")
-include("nonlinear.jl")
-include("to_sos1_bridge.jl")
+include("VerticalBridge.jl")
+include("SpecifySetTypeBridge.jl")
+include("ComplementsVectorizeBridge.jl")
+include("SplitIntervalBridge.jl")
+include("FlipSignBridge.jl")
+include("NonlinearBridge.jl")
+include("ToSOS1Bridge.jl")
 
 """
     add_all_bridges(model::MOI.ModelLike, ::Type{T} = Float64)
