@@ -6,8 +6,8 @@
 module TestFlipSignBridge
 
 using Test
-using JuMP
-using MathOptComplements
+import MathOptComplements
+import MathOptInterface as MOI
 
 function runtests()
     is_test(name) = startswith("$name", "test_")
