@@ -10,6 +10,7 @@ mutable struct Optimizer{T,O<:MOI.ModelLike} <:
     constraint_map::MOI.Bridges.Constraint.Map
     con_to_name::Dict{MOI.ConstraintIndex,String}
     name_to_con::Union{Dict{String,MOI.ConstraintIndex},Nothing}
+
     function Optimizer{T}(model::MOI.ModelLike) where {T}
         return new{T,typeof(model)}(
             model,
@@ -45,12 +46,14 @@ MOI.Bridges.is_bridged(::Optimizer, ::Type{<:MOI.AbstractSet}) = false
 
 # Complements and ComplementsWithSetType are bridged
 MOI.Bridges.is_bridged(::Optimizer, ::Type{MOI.Complements}) = true
+
 function MOI.Bridges.supports_bridging_constrained_variable(
     ::Optimizer,
     ::Type{MOI.Complements},
 )
     return true
 end
+
 function MOI.Bridges.bridge_type(
     ::Optimizer{T},
     ::Type{MOI.Complements},
@@ -59,6 +62,7 @@ function MOI.Bridges.bridge_type(
 end
 
 MOI.Bridges.is_bridged(::Optimizer, ::Type{<:ComplementsWithSetType}) = true
+
 function MOI.Bridges.supports_bridging_constrained_variable(
     ::Optimizer,
     ::Type{<:ComplementsWithSetType},
@@ -86,6 +90,7 @@ function MOI.Bridges.is_bridged(
 )
     return true
 end
+
 function MOI.Bridges.supports_bridging_constraint(
     ::Optimizer,
     ::Type{<:MOI.AbstractVectorFunction},
@@ -93,6 +98,7 @@ function MOI.Bridges.supports_bridging_constraint(
 )
     return true
 end
+
 function MOI.Bridges.bridge_type(
     ::Optimizer{T},
     ::Type{<:MOI.AbstractVectorFunction},
@@ -118,6 +124,7 @@ function MOI.Bridges.is_bridged(
 )
     return true
 end
+
 function MOI.Bridges.supports_bridging_constraint(
     ::Optimizer,
     ::Type{<:MOI.AbstractVectorFunction},
@@ -251,8 +258,10 @@ function _additional_arguments(
     return (model.reformulation,)
 end
 
-# TODO it would be nice if MOI was defining this `MOI.Bridges.additional_arguments` function and
-#      already had this implementation of `add_bridged_constraint` so that I don't have to reimplement it
+# TODO(blegat): it would be nice if MOI was defining this
+# `MOI.Bridges.additional_arguments` function and already had this
+# implementation of `add_bridged_constraint` so that I don't have to reimplement
+# it
 function MOI.Bridges.add_bridged_constraint(b::Optimizer, BridgeType, f, s)
     bridge = MOI.Bridges.Constraint.Constraint.bridge_constraint(
         BridgeType,
@@ -261,7 +270,8 @@ function MOI.Bridges.add_bridged_constraint(b::Optimizer, BridgeType, f, s)
         s,
         _additional_arguments(b, BridgeType)...,
     )
-    # The rest is copy-pasted from the default implementation of `add_bridged_constraint` in MOI
+    # The rest is copy-pasted from the default implementation of
+    # `add_bridged_constraint` in MOI
     ci = MOI.Bridges.Constraint.add_key_for_bridge(
         MOI.Bridges.Constraint.bridges(b)::MOI.Bridges.Constraint.Map,
         bridge,
