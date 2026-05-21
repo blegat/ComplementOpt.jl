@@ -31,7 +31,7 @@ using MathOptComplements
                     model,
                     MOI.GreaterThan(0.0),
                 )
-                f = MOIU.operate(vcat, Float64, -1.0 * x, 1.0 * y)
+                f = MOI.Utilities.operate(vcat, Float64, -1.0 * x, 1.0 * y)
                 MOI.add_constraint(
                     model,
                     f,
@@ -63,7 +63,7 @@ using MathOptComplements
                 x, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
                 y, _ =
                     MOI.add_constrained_variable(model, MOI.LessThan(0.0))
-                f = MOIU.operate(vcat, Float64, -1.0 * x, 1.0 * y)
+                f = MOI.Utilities.operate(vcat, Float64, -1.0 * x, 1.0 * y)
                 MOI.add_constraint(
                     model,
                     f,
@@ -101,7 +101,7 @@ using MathOptComplements
                     model,
                     MOI.GreaterThan(3.0),
                 )
-                f = MOIU.operate(vcat, Float64, -1.0 * x, 1.0 * y)
+                f = MOI.Utilities.operate(vcat, Float64, -1.0 * x, 1.0 * y)
                 MOI.add_constraint(
                     model,
                     f,
@@ -137,7 +137,7 @@ using MathOptComplements
                 x, _ = MOI.add_constrained_variable(model, MOI.LessThan(0.0))
                 y, _ =
                     MOI.add_constrained_variable(model, MOI.LessThan(-2.0))
-                f = MOIU.operate(vcat, Float64, -1.0 * x, 1.0 * y)
+                f = MOI.Utilities.operate(vcat, Float64, -1.0 * x, 1.0 * y)
                 MOI.add_constraint(
                     model,
                     f,

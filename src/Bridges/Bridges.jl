@@ -6,7 +6,7 @@
 module Bridges
 
 import MathOptInterface as MOI
-const MOIU = MOI.Utilities
+
 using ..MathOptComplements:
     ComplementsWithSetType,
     AbstractComplementarityRelaxation,
