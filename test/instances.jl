@@ -3,7 +3,12 @@
 # Use of this source code is governed by an MIT-style license that can be found
 # in the LICENSE.md file or at https://opensource.org/licenses/MIT.
 
+module Instances
+
 using JuMP
+using Test
+
+import Ipopt
 
 # Solution reported by Sven Leyffer in MacMPEC:
 # https://wiki.mcs.anl.gov/leyffer/index.php/MacMPEC
@@ -18,6 +23,29 @@ const MACMPEC_SOLUTIONS = Dict{Symbol,Float64}(
     :scholtes4_model => 0.0, # Here, we found a different solution than in MacMPEC (3.07336e-7)
     :water_net_model => 930.6687, # Solution reported is slightly worse than in MacMPEC (929.169)
 )
+
+# Some instances are flaky in CI around the reference optimum, so we loosen
+# the tolerance on a per-instance basis.
+const MACMPEC_TOLERANCES = Dict(:water_net_model => (rtol = 1e-2, atol = 1e-2))
+
+function runtests(make_opt)
+    is_test(s) = !startswith("$s", "#") && endswith("$s", "_model")
+    @testset "$name" for name in filter(is_test, names(@__MODULE__; all = true))
+        model = getfield(@__MODULE__, name)()
+        set_optimizer(model, () -> make_opt(Ipopt.Optimizer()))
+        set_attribute(model, "bound_relax_factor", 0.0)
+        set_attribute(model, "mu_strategy", "adaptive")
+        set_attribute(model, "bound_push", 1e-1)
+        set_silent(model)
+        optimize!(model)
+        @test is_solved_and_feasible(model)
+        if haskey(MACMPEC_SOLUTIONS, name)
+            tol = get(MACMPEC_TOLERANCES, name, (rtol = 1e-4, atol = 1e-4))
+            @test objective_value(model) ≈ MACMPEC_SOLUTIONS[name] rtol=tol.rtol atol=tol.atol
+        end
+    end
+    return
+end
 
 # Ex. (2.2) from "Local convergence of SQP methods for MPECs".
 # Solution is (0.5, 0.5), basic multipliers is (0, 1, 0)
@@ -439,3 +467,5 @@ function water_net_model()
 
     return model
 end
+
+end  # module Instances
