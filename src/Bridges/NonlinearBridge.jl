@@ -155,6 +155,7 @@ function _complementarity_bounds(
 ) where {T}
     return (zero(T), T(Inf))
 end
+
 function _complementarity_bounds(
     ::Type{MOI.Nonpositives},
     model,
@@ -163,6 +164,7 @@ function _complementarity_bounds(
 ) where {T}
     return (T(-Inf), zero(T))
 end
+
 function _complementarity_bounds(
     ::Type{MOI.Zeros},
     model,
@@ -171,6 +173,7 @@ function _complementarity_bounds(
 ) where {T}
     return (zero(T), zero(T))
 end
+
 function _complementarity_bounds(
     ::Type{<:MOI.GreaterThan},
     model,
@@ -179,6 +182,7 @@ function _complementarity_bounds(
 ) where {T}
     return (MOI.Utilities.get_bounds(model, T, x2)[1], T(Inf))
 end
+
 function _complementarity_bounds(
     ::Type{<:MOI.LessThan},
     model,
@@ -187,6 +191,7 @@ function _complementarity_bounds(
 ) where {T}
     return (T(-Inf), MOI.Utilities.get_bounds(model, T, x2)[2])
 end
+
 function _complementarity_bounds(
     ::Type{<:MOI.Interval},
     model,
@@ -197,11 +202,15 @@ function _complementarity_bounds(
 end
 
 """
-    reformulate_as_nonlinear_program!(model, relaxation, fun, set::ComplementsWithSetType{S})
+    reformulate_as_nonlinear_program!(
+        model,
+        relaxation,
+        fun,
+        set::ComplementsWithSetType{S},
+    )
 
 Reformulate complementarity constraints as a nonlinear program using the given
 relaxation. The set type `S` determines which bound case to use.
-
 """
 function reformulate_as_nonlinear_program!(
     model::MOI.ModelLike,
@@ -334,7 +343,6 @@ For `epsilon ≥ 0`, the complementarity constraint `0 ≤ a ⟂ b ≥ 0` is ref
 0 ≤ b
 a + b - sqrt((a + b)^2 + epsilon) ≤ 0
 ```
-
 """
 struct FischerBurmeisterRelaxation{T} <: AbstractComplementarityRelaxation
     epsilon::T
@@ -439,11 +447,25 @@ For `epsilon ≥ 0`, the complementarity constraint `0 ≤ a ⟂ b ≥ 0` is ref
 ```
 a . b ≤ epsilon^2
 (a + epsilon) . (b + epsilon) ≥ epsilon^2
-
 ```
 """
 struct LiuFukushimaRelaxation{T} <: AbstractComplementarityRelaxation
     epsilon::T
+end
+
+function _remove_bounds!(model::MOI.ModelLike, x::MOI.VariableIndex)
+    for cidx in [
+        MOI.ConstraintIndex{MOI.VariableIndex,MOI.Interval{Float64}}(x.value),
+        MOI.ConstraintIndex{MOI.VariableIndex,MOI.LessThan{Float64}}(x.value),
+        MOI.ConstraintIndex{MOI.VariableIndex,MOI.GreaterThan{Float64}}(
+            x.value,
+        ),
+    ]
+        if MOI.is_valid(model, cidx)
+            MOI.delete(model, cidx)
+        end
+    end
+    return
 end
 
 function _relax_complementarity_lower_bound!(
@@ -528,7 +550,6 @@ with the function `ϕ`:
           -0.5 ((a -epsilon)^2 + (b - epsilon)^2)       otherwise
 
 ```
-
 """
 struct KanzowSchwarzRelaxation{T} <: AbstractComplementarityRelaxation
     epsilon::T

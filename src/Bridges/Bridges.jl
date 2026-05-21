@@ -10,8 +10,7 @@ import MathOptInterface as MOI
 using ..MathOptComplements:
     ComplementsWithSetType,
     AbstractComplementarityRelaxation,
-    ComplementarityReformulation,
-    _remove_bounds!
+    ComplementarityReformulation
 
 include("VerticalBridge.jl")
 include("SpecifySetTypeBridge.jl")
