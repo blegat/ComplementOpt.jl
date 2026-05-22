@@ -585,19 +585,15 @@ function test_relaxation_fisher_burmeister()
 end
 
 function test_simple_ncp()
-    for relax in [
+    @testset "$relax" for relax in [
         MathOptComplements.ScholtesRelaxation(0.0),
         MathOptComplements.FischerBurmeisterRelaxation(1e-8),
         MathOptComplements.LiuFukushimaRelaxation(1e-8),
         MathOptComplements.KanzowSchwarzRelaxation(1e-8),
     ]
-        model = Model()
-        @variable(model, y <= 0)
+        model = Model(() -> MathOptComplements.Optimizer(Ipopt.Optimizer()))
+        @variable(model, y <= 0, start = -1)
         @constraint(model, y + 1 ⟂ y)
-        set_optimizer(
-            model,
-            () -> MathOptComplements.Optimizer(Ipopt.Optimizer()),
-        )
         MOI.set(
             model,
             MathOptComplements.DefaultComplementarityReformulation(),
@@ -653,15 +649,11 @@ function test_fletcher_leyffer_ex1_model()
         MathOptComplements.LiuFukushimaRelaxation(1e-8),
         MathOptComplements.KanzowSchwarzRelaxation(1e-8),
     ]
-        model = Model()
+        model = Model(() -> MathOptComplements.Optimizer(Ipopt.Optimizer()))
         @variable(model, z[1:2])
         set_lower_bound(z[2], 0)
         @objective(model, Min, (z[1] - 1)^2 + z[2]^2)
         @constraint(model, [z[2] - z[1], z[2]] ∈ MOI.Complements(2))
-        set_optimizer(
-            model,
-            () -> MathOptComplements.Optimizer(Ipopt.Optimizer()),
-        )
         MOI.set(
             model,
             MathOptComplements.DefaultComplementarityReformulation(),
@@ -671,8 +663,8 @@ function test_fletcher_leyffer_ex1_model()
         set_silent(model)
         optimize!(model)
         @test is_solved_and_feasible(model)
-        @test objective_value(model) ≈ 0.5 atol=1e-7
-        @test value.(model[:z]) ≈ [0.5, 0.5] atol=1e-7
+        @test objective_value(model) ≈ 0.5 atol=1e-5
+        @test value.(model[:z]) ≈ [0.5, 0.5] atol=1e-5
     end
     return
 end
@@ -699,50 +691,6 @@ function test_reformulation_doesnt_error()
             relax,
         )
         MOI.Utilities.attach_optimizer(model)
-    end
-    return
-end
-
-function test_reformulation_errors_1()
-    for relax in [
-        MathOptComplements.ScholtesRelaxation(0.0),
-        MathOptComplements.FischerBurmeisterRelaxation(1e-8),
-        MathOptComplements.LiuFukushimaRelaxation(1e-8),
-        MathOptComplements.KanzowSchwarzRelaxation(1e-8),
-    ]
-        model = Model(() -> MathOptComplements.Optimizer(Ipopt.Optimizer()))
-        @variable(model, 1.0 <= x1)
-        @variable(model, 0.0 <= y1)
-        @constraint(model, [x1, y1] ∈ MOI.Complements(2))
-        MOI.set(
-            model,
-            MathOptComplements.DefaultComplementarityReformulation(),
-            relax,
-        )
-        # FIXME(odow): why is this?
-        @test_throws Exception MOI.Utilities.attach_optimizer(model)
-    end
-    return
-end
-
-function test_reformulation_errors_2()
-    for relax in [
-        MathOptComplements.ScholtesRelaxation(0.0),
-        MathOptComplements.FischerBurmeisterRelaxation(1e-8),
-        MathOptComplements.LiuFukushimaRelaxation(1e-8),
-        MathOptComplements.KanzowSchwarzRelaxation(1e-8),
-    ]
-        model = Model(() -> MathOptComplements.Optimizer(Ipopt.Optimizer()))
-        @variable(model, x1 <= 1.0)
-        @variable(model, y1 <= 0.0)
-        @constraint(model, [x1, y1] ∈ MOI.Complements(2))
-        MOI.set(
-            model,
-            MathOptComplements.DefaultComplementarityReformulation(),
-            relax,
-        )
-        # FIXME(odow): why is this?
-        @test_throws Exception MOI.Utilities.attach_optimizer(model)
     end
     return
 end

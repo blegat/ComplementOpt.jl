@@ -25,13 +25,11 @@ function test_Nonnegatives_lower_bound()
         MathOptComplements.Bridges.NonlinearBridge,
         """
         variables: x, y
-        x >= 0.0
         y >= 0.0
         [x, y] in $M.ComplementsWithSetType{MOI.Nonnegatives}(2)
         """,
         """
         variables: x, y
-        x >= 0.0
         y >= 0.0
         1.0 * x * y <= 0.0
         """;
@@ -45,13 +43,11 @@ function test_Nonpositives_upper_bound()
         MathOptComplements.Bridges.NonlinearBridge,
         """
         variables: x, y
-        x <= 0.0
         y <= 0.0
         [x, y] in $M.ComplementsWithSetType{MOI.Nonpositives}(2)
         """,
         """
         variables: x, y
-        x <= 0.0
         y <= 0.0
         1.0 * x * y <= 0.0
         """;
@@ -65,13 +61,11 @@ function test_GreaterThan_with_nonzero_bound()
         MathOptComplements.Bridges.NonlinearBridge,
         """
         variables: x, y
-        x >= 0.0
         y >= 3.0
         [x, y] in $M.ComplementsWithSetType{MOI.GreaterThan{Float64}}(2)
         """,
         """
         variables: x, y
-        x >= 0.0
         y >= 3.0
         1.0 * x * y + -3.0 * x <= 0.0
         """;
@@ -93,7 +87,7 @@ function test_Nonnegatives_with_unbounded_x1_lower_bound()
     )
     MOI.Bridges.final_touch(model)
     target = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
-    x1t, _ = MOI.add_constrained_variable(target, MOI.GreaterThan(0.0))
+    x1t = MOI.add_variable(target)
     x2t, _ = MOI.add_constrained_variable(target, MOI.GreaterThan(0.0))
     MOI.add_constraint(target, x1t * (x2t - 0.0), MOI.LessThan(0.0))
     MOI.Bridges._test_structural_identical(target, inner)
@@ -113,7 +107,7 @@ function test_Nonpositives_with_unbounded_x1_upper_bound()
     )
     MOI.Bridges.final_touch(model)
     target = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
-    x1t, _ = MOI.add_constrained_variable(target, MOI.LessThan(0.0))
+    x1t = MOI.add_variable(target)
     x2t, _ = MOI.add_constrained_variable(target, MOI.LessThan(0.0))
     MOI.add_constraint(target, x1t * (x2t - 0.0), MOI.LessThan(0.0))
     MOI.Bridges._test_structural_identical(target, inner)
@@ -125,13 +119,11 @@ function test_LessThan_with_nonzero_bound()
         MathOptComplements.Bridges.NonlinearBridge,
         """
         variables: x, y
-        x <= 0.0
         y <= -2.0
         [x, y] in $M.ComplementsWithSetType{MOI.LessThan{Float64}}(2)
         """,
         """
         variables: x, y
-        x <= 0.0
         y <= -2.0
         1.0 * x * y + 2.0 * x <= 0.0
         """;
@@ -157,7 +149,7 @@ function test_FB_Nonnegatives_with_unbounded_x1()
     @test MOI.get(
         inner,
         MOI.NumberOfConstraints{MOI.VariableIndex,MOI.GreaterThan{Float64}}(),
-    ) == 2
+    ) == 1
     @test MOI.get(
         inner,
         MOI.NumberOfConstraints{
@@ -185,12 +177,12 @@ function test_FB_Nonpositives_with_unbounded_x1()
     @test MOI.get(
         inner,
         MOI.NumberOfConstraints{MOI.VariableIndex,MOI.LessThan{Float64}}(),
-    ) == 2
+    ) == 1
     @test MOI.get(
         inner,
         MOI.NumberOfConstraints{
             MOI.ScalarNonlinearFunction,
-            MOI.GreaterThan{Float64},
+            MOI.LessThan{Float64},
         }(),
     ) == 1
     return
@@ -213,7 +205,7 @@ function test_KS_Nonnegatives_with_unbounded_x1()
     @test MOI.get(
         inner,
         MOI.NumberOfConstraints{MOI.VariableIndex,MOI.GreaterThan{Float64}}(),
-    ) == 2
+    ) == 1
     return
 end
 
@@ -234,7 +226,7 @@ function test_KS_Nonpositives_with_unbounded_x1()
     @test MOI.get(
         inner,
         MOI.NumberOfConstraints{MOI.VariableIndex,MOI.LessThan{Float64}}(),
-    ) == 2
+    ) == 1
     return
 end
 
