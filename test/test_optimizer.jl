@@ -742,6 +742,123 @@ function test_reformulation_fletcher_leyffer_ex1()
     return
 end
 
+function test_double_sided_bound_reformulations()
+    atol = 1e-3
+    @testset "$relaxation" for relaxation in Any[
+        MathOptComplements.ScholtesRelaxation(0.0),
+        MathOptComplements.FischerBurmeisterRelaxation(1e-8),
+        # Does not support double sided bounds
+        # MathOptComplements.LiuFukushimaRelaxation(1e-8),
+        MathOptComplements.KanzowSchwarzRelaxation(1e-8),
+    ]
+        model = Model(() -> MathOptComplements.Optimizer(Ipopt.Optimizer()))
+        set_attribute(
+            model,
+            MathOptComplements.DefaultComplementarityReformulation(),
+            relaxation,
+        )
+        @variable(model, 1 <= x <= 2, start = 1)
+        @variable(model, -1 <= y <= 3, start = 3)
+        @constraint(model, y - 1 ⟂ x)
+        set_silent(model)
+        @objective(model, Min, x - 0.01 * y)
+        optimize!(model)
+        @test is_solved_and_feasible(model)
+        @test isapprox(value(x), 1; atol)
+        @test isapprox(value(y), 3; atol)
+        @objective(model, Min, x + 0.01 * y)
+        set_start_value(x, 1)
+        set_start_value(y, 1)
+        optimize!(model)
+        @test is_solved_and_feasible(model)
+        @test isapprox(value(x), 1; atol)
+        @test isapprox(value(y), 1; atol)
+        @objective(model, Max, x - 0.01 * y)
+        optimize!(model)
+        @test is_solved_and_feasible(model)
+        @test isapprox(value(x), 2; atol)
+        @test isapprox(value(y), -1; atol)
+        @objective(model, Max, x + 0.01 * y)
+        optimize!(model)
+        @test is_solved_and_feasible(model)
+        @test isapprox(value(x), 2; atol)
+        @test isapprox(value(y), 1; atol)
+    end
+    return
+end
+
+function test_greater_than_reformulations()
+    atol = 1e-3
+    @testset "$relaxation" for relaxation in Any[
+        MathOptComplements.ScholtesRelaxation(0.0),
+        MathOptComplements.FischerBurmeisterRelaxation(1e-8),
+        MathOptComplements.LiuFukushimaRelaxation(1e-8),
+        MathOptComplements.KanzowSchwarzRelaxation(1e-8),
+    ]
+        model = Model(() -> MathOptComplements.Optimizer(Ipopt.Optimizer()))
+        set_attribute(
+            model,
+            MathOptComplements.DefaultComplementarityReformulation(),
+            relaxation,
+        )
+        @variable(model, 1 <= x, start = 1)
+        @variable(model, -1 <= y <= 3, start = 3)
+        @constraint(model, y - 1 ⟂ x)
+        set_silent(model)
+        @objective(model, Min, x - 0.01 * y)
+        optimize!(model)
+        @test is_solved_and_feasible(model)
+        @test isapprox(value(x), 1; atol)
+        @test isapprox(value(y), 3; atol)
+        @objective(model, Min, x + 0.01 * y)
+        set_start_value(x, 1)
+        set_start_value(y, 1)
+        optimize!(model)
+        @test is_solved_and_feasible(model)
+        @test isapprox(value(x), 1; atol)
+        @test isapprox(value(y), 1; atol)
+        @objective(model, Max, x)
+        optimize!(model)
+        @test !is_solved_and_feasible(model)
+    end
+    return
+end
+
+function test_less_than_reformulations()
+    atol = 1e-3
+    @testset "$relaxation" for relaxation in Any[
+        MathOptComplements.ScholtesRelaxation(0.0),
+        MathOptComplements.FischerBurmeisterRelaxation(1e-8),
+        MathOptComplements.LiuFukushimaRelaxation(1e-8),
+        MathOptComplements.KanzowSchwarzRelaxation(1e-8),
+    ]
+        model = Model(() -> MathOptComplements.Optimizer(Ipopt.Optimizer()))
+        set_attribute(
+            model,
+            MathOptComplements.DefaultComplementarityReformulation(),
+            relaxation,
+        )
+        @variable(model, x <= 2, start = 1)
+        @variable(model, -1 <= y <= 3, start = 3)
+        @constraint(model, y - 1 ⟂ x)
+        set_silent(model)
+        @objective(model, Max, x - 0.01 * y)
+        optimize!(model)
+        @test is_solved_and_feasible(model)
+        @test isapprox(value(x), 2; atol)
+        @test isapprox(value(y), -1; atol)
+        @objective(model, Max, x + 0.01 * y)
+        optimize!(model)
+        @test is_solved_and_feasible(model)
+        @test isapprox(value(x), 2; atol)
+        @test isapprox(value(y), 1; atol)
+        @objective(model, Min, x)
+        optimize!(model)
+        @test !is_solved_and_feasible(model)
+    end
+    return
+end
+
 end  # TestOptimizer
 
 TestOptimizer.runtests()

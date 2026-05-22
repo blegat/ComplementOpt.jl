@@ -315,19 +315,25 @@ end
 
 Implement the Liu-Fukushima relaxation for complementarity constraints.
 
-For ``\\epsilon \\ge 0``, the complementarity constraint
+For ``\\epsilon \\ge 0``, the complementarity constraint:
 ```math
 f(x) \\perp l \\le x \\le u
 ```
-is reformulated as
+is reformulated, if ``l > -\\infty`` as:
 ```math
 \\begin{aligned}
 f(x) \\cdot (x - l) \\le \\epsilon^2                                \\\\
-(f(x) + \\epsilon) \\cdot (x - l + \\epsilon) \\ge \\epsilon^2      \\\\
+(f(x) + \\epsilon) \\cdot (x - l + \\epsilon) \\ge \\epsilon^2
+```
+or, if ``u < \\infty``:
+```math
 -f(x) \\cdot (u - x) \\le \\epsilon^2                               \\\\
 (-f(x) + \\epsilon) \\cdot (u - x + \\epsilon) \\ge \\epsilon^2
 \\end{aligned}
 ```
+
+This reformulation does not support the case where
+``-\\infty < l \\le u < \\infty``.
 """
 struct LiuFukushimaRelaxation{T} <: AbstractComplementarityRelaxation
     epsilon::T
@@ -342,15 +348,15 @@ function _reformulate!(
     l::T,
     u::T,
 ) where {T}
+    @assert isinf(l) || isinf(u)
     ε = relaxation.epsilon
     if !isinf(l)
         push!(ret, MOI.add_constraint(model, F * (x - l), MOI.LessThan(ε^2)))
         f = (F + ε) * (x - l + ε)
         push!(ret, MOI.add_constraint(model, f, MOI.GreaterThan(ε^2)))
-    end
-    if !isinf(u)
+    elseif !isinf(u)
         push!(ret, MOI.add_constraint(model, F * (x - u), MOI.LessThan(ε^2)))
-        f = (-1.0 * F + ε) * (u - x + ε)
+        f = (F - ε) * (x - u - ε)
         push!(ret, MOI.add_constraint(model, f, MOI.GreaterThan(ε^2)))
     end
     return
