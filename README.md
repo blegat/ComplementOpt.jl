@@ -56,31 +56,13 @@ set_attribute(model, "bound_relax_factor", 0.0)
 ## Supported reformulations
 
 You can change the reformulation by using the optimizer attribute
-`MathOptComplements.DefaultComplementarityReformulation`. MathOptComplements
-supports the following reformulations:
+`MathOptComplements.DefaultComplementarityReformulation`. The following values
+are supported. Check their docstrings for details.
 
 - `MathOptComplements.ScholtesRelaxation(tau)` (**default**)
-
-  Reformulates the complementarity $0 \le a \perp b \ge 0$ as $a, b \ge 0$ and
-  $a \cdot b ≤ \tau$. For $\tau = 0$, the reformulation is exact and leads to the
-  formulation of a degenerate nonlinear program. The larger the parameter
-  $\tau \ge 0$, the better the behavior in Ipopt.
-
 - `MathOptComplements.FischerBurmeisterRelaxation(tau)`
-
-  Reformulates the complementarity $0 \le a \perp b \ge 0$ as $a, b \ge 0$ and
-  $a + b \le \sqrt{(a+b)^2 + \tau}$.
-
 - `MathOptComplements.LiuFukushimaRelaxation(tau)`
-
-  Reformulates the complementarity $0 \le a \perp b \ge 0$ as $a\cdot b \le \tau^2$
-  and $(a + \tau)(b + \tau) \ge \tau^2$.
-
 - `MathOptComplements.KanzowSchwarzRelaxation(tau)`
-
-  Reformulates the complementarity $0 \le a \perp b \ge 0$ as $a, b \ge 0$ and
-  $\phi(a, b) \le 0$, with $\phi(a, b) = (a - \tau)(b - \tau)$ if $a + b > 2\tau$,
-  $-0.5((a - \tau)^2 + (b - \tau)^2)$ otherwise.
 
 Most reformulations are not equivalent to the original problem, which is why
 they are not activated by default. [This arXiv paper](https://arxiv.org/html/2312.11022v2)

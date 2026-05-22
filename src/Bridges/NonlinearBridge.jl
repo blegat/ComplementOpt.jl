@@ -30,7 +30,6 @@ The relaxation method is determined by the
 
 `NonlinearBridge` creates nonlinear constraints depending on the relaxation
 method (for example, quadratic or `ScalarNonlinearFunction` constraints).
-
 """
 mutable struct NonlinearBridge{T,S} <: MOI.Bridges.Constraint.AbstractBridge
     constraints::Vector
@@ -136,12 +135,7 @@ function MOI.Bridges.final_touch(bridge::NonlinearBridge, model::MOI.ModelLike)
     end
     append!(
         bridge.constraints,
-        reformulate_as_nonlinear_program!(
-            model,
-            bridge.reformulation,
-            bridge.func,
-            bridge.set,
-        ),
+        _reformulate!(model, bridge.reformulation, bridge.func, bridge.set),
     )
     return
 end
@@ -151,464 +145,277 @@ function _complementarity_bounds(
     ::Type{MOI.Nonnegatives},
     model,
     ::Type{T},
-    x2,
+    x,
 ) where {T}
-    return (zero(T), T(Inf))
+    return (zero(T), typemax(T))
 end
 
 function _complementarity_bounds(
     ::Type{MOI.Nonpositives},
     model,
     ::Type{T},
-    x2,
+    x,
 ) where {T}
-    return (T(-Inf), zero(T))
+    return (typemin(T), zero(T))
 end
 
 function _complementarity_bounds(
     ::Type{MOI.Zeros},
     model,
     ::Type{T},
-    x2,
+    x,
 ) where {T}
     return (zero(T), zero(T))
 end
 
 function _complementarity_bounds(
-    ::Type{<:MOI.GreaterThan},
+    ::Type{MOI.GreaterThan{T}},
     model,
     ::Type{T},
-    x2,
+    x,
 ) where {T}
-    return (MOI.Utilities.get_bounds(model, T, x2)[1], T(Inf))
+    return (MOI.Utilities.get_bounds(model, T, x)[1], typemax(T))
 end
 
 function _complementarity_bounds(
-    ::Type{<:MOI.LessThan},
+    ::Type{MOI.LessThan{T}},
     model,
     ::Type{T},
-    x2,
+    x,
 ) where {T}
-    return (T(-Inf), MOI.Utilities.get_bounds(model, T, x2)[2])
+    return (typemin(T), MOI.Utilities.get_bounds(model, T, x)[2])
 end
 
 function _complementarity_bounds(
-    ::Type{<:MOI.Interval},
+    ::Type{MOI.Interval{T}},
     model,
     ::Type{T},
-    x2,
+    x,
 ) where {T}
-    return MOI.Utilities.get_bounds(model, T, x2)
+    return MOI.Utilities.get_bounds(model, T, x)
 end
 
-"""
-    reformulate_as_nonlinear_program!(
-        model,
-        relaxation,
-        fun,
-        set::ComplementsWithSetType{S},
-    )
-
-Reformulate complementarity constraints as a nonlinear program using the given
-relaxation. The set type `S` determines which bound case to use.
-"""
-function reformulate_as_nonlinear_program!(
+function _reformulate!(
     model::MOI.ModelLike,
     relaxation::AbstractComplementarityRelaxation,
-    fun,
+    fun::MOI.VectorOfVariables,
     set::ComplementsWithSetType{S},
 ) where {S}
     n_comp = div(set.dimension, 2)
-    ind_cc = []
+    ret = MOI.ConstraintIndex[]
     for cc in 1:n_comp
-        x1 = fun.variables[cc]
-        x2 = fun.variables[cc+n_comp]
-        lb2, ub2 = _complementarity_bounds(S, model, Float64, x2)
-        if isinf(ub2)
-            idc = _relax_complementarity_lower_bound!(
-                model,
-                relaxation,
-                x1,
-                x2,
-                lb2,
-                ub2,
-            )
-        elseif isinf(lb2)
-            idc = _relax_complementarity_upper_bound!(
-                model,
-                relaxation,
-                x1,
-                x2,
-                lb2,
-                ub2,
-            )
-        else
-            idc = _relax_complementarity_range!(
-                model,
-                relaxation,
-                x1,
-                x2,
-                lb2,
-                ub2,
-            )
-        end
-        append!(ind_cc, idc)
+        F, x = fun.variables[cc], fun.variables[cc+n_comp]
+        l, u = _complementarity_bounds(S, model, Float64, x)
+        _reformulate!(ret, model, relaxation, F, x, l, u)
     end
-    return ind_cc
+    return ret
 end
 
 """
-    ScholtesRelaxation <: AbstractComplementarityRelaxation
+    ScholtesRelaxation{T<:Real}(tau::T) <: AbstractComplementarityRelaxation
 
 Implement the Scholtes relaxation.
-For `tau ≥ 0`, the complementarity constraint `0 ≤ a ⟂ b ≥ 0` is reformulated as
-```
-0 ≤ a
-0 ≤ b
-a . b ≤ tau
-```
 
-If `tau` is equal to 0, then the relaxation is exact.
-
+For ``\\tau \\ge 0``, the complementarity constraint
+```math
+f(x) \\perp l \\le x \\le u
+```
+is reformulated as
+```math
+\\begin{aligned}
+f(x) \\cdot (x - l) \\le \\tau       \\\\
+f(x) \\cdot (x - u) \\le \\tau
+\\end{aligned}
+```
+If ``\\tau`` is equal to 0, then the relaxation is exact.
 """
-struct ScholtesRelaxation{T} <: AbstractComplementarityRelaxation
+struct ScholtesRelaxation{T<:Real} <: AbstractComplementarityRelaxation
     tau::T
 end
 
-# x1 ⟂ (lb <= x2)   ≡  0 <= x1 ; lb <= x2 ; x1 ( x2 - lb) <= 0
-function _relax_complementarity_lower_bound!(
+function _reformulate!(
+    ret::Vector{MOI.ConstraintIndex},
     model::MOI.ModelLike,
     relaxation::ScholtesRelaxation,
-    x1,
-    x2,
-    lb2,
-    ub2,
-)
-    lb1, _ = MOI.Utilities.get_bounds(model, Float64, x1)
-    if isinf(lb1)
-        MOI.add_constraint(model, x1, MOI.GreaterThan(0.0))
-    else
-        @assert lb1 == 0.0 # ensure we follow MOI's convention
-        # TODO: what should we do if ub1 is finite?
+    F::MOI.VariableIndex,
+    x::MOI.VariableIndex,
+    l::T,
+    u::T,
+) where {T}
+    if !isinf(l)
+        f = F * (x - l)
+        push!(ret, MOI.add_constraint(model, f, MOI.LessThan(relaxation.tau)))
     end
-    idc =
-        MOI.add_constraint(model, x1 * (x2 - lb2), MOI.LessThan(relaxation.tau))
-    return [idc]
-end
-
-# x1 ⟂ (x2 <= ub)   ≡  x1 <= 0 ; lb <= x2 ; x1 ( x2 - ub) <= 0
-function _relax_complementarity_upper_bound!(
-    model::MOI.ModelLike,
-    relaxation::ScholtesRelaxation,
-    x1,
-    x2,
-    lb2,
-    ub2,
-)
-    _, ub1 = MOI.Utilities.get_bounds(model, Float64, x1)
-    if isinf(ub1)
-        MOI.add_constraint(model, x1, MOI.LessThan(0.0))
-    else
-        @assert ub1 == 0.0 # ensure we follow MOI's convention
-        # TODO: what should we do if lb1 is finite?
+    if !isinf(u)
+        f = F * (x - u)
+        push!(ret, MOI.add_constraint(model, f, MOI.LessThan(relaxation.tau)))
     end
-    idc =
-        MOI.add_constraint(model, x1 * (x2 - ub2), MOI.LessThan(relaxation.tau))
-    return [idc]
-end
-
-# x1 ⟂ (lb <= x2 <= ub) ≡  lb <= x2 <= ub ; x1 (x2 - lb)  <= 0 ; x1 (x2 - ub) <= 0
-function _relax_complementarity_range!(
-    model::MOI.ModelLike,
-    relaxation::ScholtesRelaxation,
-    x1,
-    x2,
-    lb2,
-    ub2,
-)
-    idc1 =
-        MOI.add_constraint(model, x1 * (x2 - lb2), MOI.LessThan(relaxation.tau))
-    idc2 =
-        MOI.add_constraint(model, x1 * (x2 - ub2), MOI.LessThan(relaxation.tau))
-    return [idc1, idc2]
+    return
 end
 
 """
-    FischerBurmeisterRelaxation <: AbstractComplementarityRelaxation
+    FischerBurmeisterRelaxation{T}(epsilon::T) <:
+    AbstractComplementarityRelaxation
 
 Implement the Fischer-Burmeister relaxation for complementarity constraints.
-For `epsilon ≥ 0`, the complementarity constraint `0 ≤ a ⟂ b ≥ 0` is reformulated as
+
+For ``\\epsilon \\ge 0``, the complementarity constraint
+```math
+f(x) \\perp l \\le x \\le u
 ```
-0 ≤ a
-0 ≤ b
-a + b - sqrt((a + b)^2 + epsilon) ≤ 0
+is reformulated as
+```math
+\\begin{aligned}
+\\phi(u(x), x - l) \\le 0       \\\\
+\\phi(-f(x), u - x) \\le 0
+\\end{aligned}
+```
+where
+```math
+\\phi(a, b) = a + b - \\sqrt{a^2 + b^2 + \\epsilon}
 ```
 """
 struct FischerBurmeisterRelaxation{T} <: AbstractComplementarityRelaxation
     epsilon::T
 end
 
-function _min_eps(a, b, eps)
+function _phi(relaxation::FischerBurmeisterRelaxation, a, b)
+    eps = relaxation.epsilon
     return MOI.ScalarNonlinearFunction(
         :-,
         Any[
             1.0*a+1.0*b,
-            MOI.ScalarNonlinearFunction(:sqrt, Any[(1.0*a)^2+(1.0*b)^2+eps^2]),
+            MOI.ScalarNonlinearFunction(:sqrt, Any[(1.0*a)^2+(1.0*b)^2+eps]),
         ],
     )
 end
 
-function _max_eps(a, b, eps)
-    return MOI.ScalarNonlinearFunction(
-        :+,
-        Any[
-            1.0*a+1.0*b,
-            MOI.ScalarNonlinearFunction(:sqrt, Any[(1.0*a)^2+(1.0*b)^2+eps^2]),
-        ],
-    )
-end
-
-# x1 ⟂ (lb <= x2)   ≡  0 <= x1 ; lb <= x2 ; min(x1, x2 - lb) <= 0
-function _relax_complementarity_lower_bound!(
+function _reformulate!(
+    ret::Vector{MOI.ConstraintIndex},
     model::MOI.ModelLike,
     relaxation::FischerBurmeisterRelaxation,
-    x1,
-    x2,
-    lb2,
-    ub2,
-)
-    lb1, ub1 = MOI.Utilities.get_bounds(model, Float64, x1)
-    if isinf(lb1)
-        MOI.add_constraint(model, x1, MOI.GreaterThan(0.0))
-    else
-        @assert lb1 == 0.0 # ensure we follow MOI's convention
-        # TODO: what should we do if ub1 is finite?
+    F::MOI.VariableIndex,
+    x::MOI.VariableIndex,
+    l::T,
+    u::T,
+) where {T}
+    if !isinf(l)
+        f = _phi(relaxation, F, x - l)
+        push!(ret, MOI.add_constraint(model, f, MOI.LessThan(0.0)))
     end
-    idc = MOI.add_constraint(
-        model,
-        _min_eps(x1, x2 - lb2, relaxation.epsilon),
-        MOI.LessThan(0.0),
-    )
-    return [idc]
-end
-
-# x1 ⟂ (x2 <= ub)   ≡  x1 <= 0 ; lb <= x2 ; max(x1, x2 - ub) >= 0
-function _relax_complementarity_upper_bound!(
-    model::MOI.ModelLike,
-    relaxation::FischerBurmeisterRelaxation,
-    x1,
-    x2,
-    lb2,
-    ub2,
-)
-    lb1, ub1 = MOI.Utilities.get_bounds(model, Float64, x1)
-    if isinf(ub1)
-        MOI.add_constraint(model, x1, MOI.LessThan(0.0))
-    else
-        @assert ub1 == 0.0 # ensure we follow MOI's convention
-        # TODO: what should we do if lb1 is finite?
+    if !isinf(u)
+        f = _phi(relaxation, -1.0 * F, u - x)
+        push!(ret, MOI.add_constraint(model, f, MOI.LessThan(0.0)))
     end
-    idc = MOI.add_constraint(
-        model,
-        _max_eps(x1, x2 - ub2, relaxation.epsilon),
-        MOI.GreaterThan(0.0),
-    )
-    return [idc]
-end
-
-# x1 ⟂ (lb <= x2 <= ub) ≡  lb <= x2 <= ub ; min(x1, x2 - lb) <= 0 ; max(x1, x2 - ub) >= 0
-function _relax_complementarity_range!(
-    model::MOI.ModelLike,
-    relaxation::FischerBurmeisterRelaxation,
-    x1,
-    x2,
-    lb2,
-    ub2,
-)
-    lb1, ub1 = MOI.Utilities.get_bounds(model, Float64, x1)
-    idc1 = MOI.add_constraint(
-        model,
-        _min_eps(x1, x2 - lb2, relaxation.epsilon),
-        MOI.LessThan(0.0),
-    )
-    idc2 = MOI.add_constraint(
-        model,
-        _max_eps(x1, x2 - ub2, relaxation.epsilon),
-        MOI.GreaterThan(0.0),
-    )
-    return [idc1, idc2]
+    return
 end
 
 """
     LiuFukushimaRelaxation <: AbstractComplementarityRelaxation
 
 Implement the Liu-Fukushima relaxation for complementarity constraints.
-For `epsilon ≥ 0`, the complementarity constraint `0 ≤ a ⟂ b ≥ 0` is reformulated as
+
+For ``\\epsilon \\ge 0``, the complementarity constraint:
+```math
+f(x) \\perp l \\le x \\le u
 ```
-a . b ≤ epsilon^2
-(a + epsilon) . (b + epsilon) ≥ epsilon^2
+is reformulated, if ``l > -\\infty`` as:
+```math
+\\begin{aligned}
+f(x) \\cdot (x - l) \\le \\epsilon^2                                \\\\
+(f(x) + \\epsilon) \\cdot (x - l + \\epsilon) \\ge \\epsilon^2
 ```
+or, if ``u < \\infty``:
+```math
+-f(x) \\cdot (u - x) \\le \\epsilon^2                               \\\\
+(-f(x) + \\epsilon) \\cdot (u - x + \\epsilon) \\ge \\epsilon^2
+\\end{aligned}
+```
+
+This reformulation does not support the case where
+``-\\infty < l \\le u < \\infty``.
 """
 struct LiuFukushimaRelaxation{T} <: AbstractComplementarityRelaxation
     epsilon::T
 end
 
-function _remove_bounds!(model::MOI.ModelLike, x::MOI.VariableIndex)
-    for cidx in [
-        MOI.ConstraintIndex{MOI.VariableIndex,MOI.Interval{Float64}}(x.value),
-        MOI.ConstraintIndex{MOI.VariableIndex,MOI.LessThan{Float64}}(x.value),
-        MOI.ConstraintIndex{MOI.VariableIndex,MOI.GreaterThan{Float64}}(
-            x.value,
-        ),
-    ]
-        if MOI.is_valid(model, cidx)
-            MOI.delete(model, cidx)
-        end
+function _reformulate!(
+    ret::Vector{MOI.ConstraintIndex},
+    model::MOI.ModelLike,
+    relaxation::LiuFukushimaRelaxation,
+    F::MOI.VariableIndex,
+    x::MOI.VariableIndex,
+    l::T,
+    u::T,
+) where {T}
+    @assert isinf(l) || isinf(u)
+    ε = relaxation.epsilon
+    if !isinf(l)
+        push!(ret, MOI.add_constraint(model, F * (x - l), MOI.LessThan(ε^2)))
+        f = (F + ε) * (x - l + ε)
+        push!(ret, MOI.add_constraint(model, f, MOI.GreaterThan(ε^2)))
+    elseif !isinf(u)
+        push!(ret, MOI.add_constraint(model, F * (x - u), MOI.LessThan(ε^2)))
+        f = (F - ε) * (x - u - ε)
+        push!(ret, MOI.add_constraint(model, f, MOI.GreaterThan(ε^2)))
     end
     return
-end
-
-function _relax_complementarity_lower_bound!(
-    model::MOI.ModelLike,
-    relaxation::LiuFukushimaRelaxation,
-    x1,
-    x2,
-    lb2,
-    ub2,
-)
-    # Ensure we respect MOI's specs
-    lb1, _ = MOI.Utilities.get_bounds(model, Float64, x1)
-    @assert isinf(lb1) || iszero(lb1)
-
-    idc1 = MOI.add_constraint(
-        model,
-        x1 * (x2 - lb2),
-        MOI.LessThan(relaxation.epsilon^2),
-    )
-    idc2 = MOI.add_constraint(
-        model,
-        (x1 + relaxation.epsilon) * (x2 - lb2 + relaxation.epsilon),
-        MOI.GreaterThan(relaxation.epsilon^2),
-    )
-
-    # Remove bounds
-    _remove_bounds!(model, x1)
-    cidx = MOI.ConstraintIndex{MOI.VariableIndex,MOI.GreaterThan{Float64}}(
-        x2.value,
-    )
-    MOI.delete(model, cidx)
-
-    return [idc1, idc2]
-end
-
-function _relax_complementarity_upper_bound!(
-    model::MOI.ModelLike,
-    relaxation::LiuFukushimaRelaxation,
-    x1,
-    x2,
-    lb2,
-    ub2,
-)
-    # Ensure we respect MOI's specs
-    _, ub1 = MOI.Utilities.get_bounds(model, Float64, x1)
-    @assert isinf(ub1) || iszero(ub1)
-
-    idc1 = MOI.add_constraint(
-        model,
-        x1 * (x2 - ub2),
-        MOI.LessThan(relaxation.epsilon^2),
-    )
-    idc2 = MOI.add_constraint(
-        model,
-        (x1 - relaxation.epsilon) * (x2 - ub2 - relaxation.epsilon),
-        MOI.GreaterThan(relaxation.epsilon^2),
-    )
-
-    # Remove bounds
-    _remove_bounds!(model, x1)
-    cidx =
-        MOI.ConstraintIndex{MOI.VariableIndex,MOI.LessThan{Float64}}(x2.value)
-    MOI.delete(model, cidx)
-
-    return [idc1, idc2]
 end
 
 """
     KanzowSchwarzRelaxation <: AbstractComplementarityRelaxation
 
 Implement the Kanzow-Schwarz relaxation for complementarity constraints.
-For `epsilon ≥ 0`, the complementarity constraint `0 ≤ a ⟂ b ≥ 0` is reformulated as
-```
-0 ≤ a
-0 ≤ b
-ϕ(a, b) ≤ 0
 
+For ``\\epsilon \\ge 0``, the complementarity constraint
+```math
+f(x) \\perp l \\le x \\le u
 ```
-with the function `ϕ`:
+is reformulated as
+```math
+\\begin{aligned}
+\\phi(f(x), x - l) \\le 0       \\\\
+\\phi(-f(x), u - x) \\le 0
+\\end{aligned}
 ```
-ϕ(a, b) = (a - epsilon) . (b - epsilon)                 if a + b > 2 epsilon
-          -0.5 ((a -epsilon)^2 + (b - epsilon)^2)       otherwise
-
+where
+```
+ϕ(a, b) = (a - ε) * (b - ε)           if a + b > 2ε
+          -((a - ε)^2 + (b - ε)^2)/2  otherwise
 ```
 """
 struct KanzowSchwarzRelaxation{T} <: AbstractComplementarityRelaxation
     epsilon::T
 end
 
-function _kanzow_schwarz_relaxation(a, b, eps)
+function _phi(relaxation::KanzowSchwarzRelaxation, a, b)
+    eps = relaxation.epsilon
     return MOI.ScalarNonlinearFunction(
         :ifelse,
         Any[
             MOI.ScalarNonlinearFunction(:>, Any[1.0*a+1.0*b, 2*eps]),
             (a-eps)*(b-eps),
-            - 0.5*((a-eps)^2+(b-eps)^2),
+            -0.5*((a-eps)^2+(b-eps)^2),
         ],
     )
 end
 
-function _relax_complementarity_lower_bound!(
+function _reformulate!(
+    ret::Vector{MOI.ConstraintIndex},
     model::MOI.ModelLike,
     relaxation::KanzowSchwarzRelaxation,
-    x1,
-    x2,
-    lb2,
-    ub2,
-)
-    lb1, ub1 = MOI.Utilities.get_bounds(model, Float64, x1)
-    if isinf(lb1)
-        MOI.add_constraint(model, x1, MOI.GreaterThan(0.0))
-    else
-        @assert lb1 == 0.0 # ensure we follow MOI's convention
-        # TODO: what should we do if ub1 is finite?
+    F::MOI.VariableIndex,
+    x::MOI.VariableIndex,
+    l::T,
+    u::T,
+) where {T}
+    if !isinf(l)
+        f = _phi(relaxation, F, x - l)
+        push!(ret, MOI.add_constraint(model, f, MOI.LessThan(0.0)))
     end
-    idc = MOI.add_constraint(
-        model,
-        _kanzow_schwarz_relaxation(x1, x2 - lb2, relaxation.epsilon),
-        MOI.LessThan(0.0),
-    )
-    return [idc]
-end
-
-# x1 ⟂ (x2 <= ub)   ≡  x1 <= 0 ; lb <= x2 ; max(x1, x2 - ub) >= 0
-function _relax_complementarity_upper_bound!(
-    model::MOI.ModelLike,
-    relaxation::KanzowSchwarzRelaxation,
-    x1,
-    x2,
-    lb2,
-    ub2,
-)
-    lb1, ub1 = MOI.Utilities.get_bounds(model, Float64, x1)
-    if isinf(ub1)
-        MOI.add_constraint(model, x1, MOI.LessThan(0.0))
-    else
-        @assert ub1 == 0.0 # ensure we follow MOI's convention
-        # TODO: what should we do if lb1 is finite?
+    if !isinf(u)
+        f = _phi(relaxation, -1.0 * F, u - x)
+        push!(ret, MOI.add_constraint(model, f, MOI.LessThan(0.0)))
     end
-    idc = MOI.add_constraint(
-        model,
-        _kanzow_schwarz_relaxation(-1.0*x1, ub2 - x2, relaxation.epsilon),
-        MOI.LessThan(0.0),
-    )
-    return [idc]
+    return
 end
