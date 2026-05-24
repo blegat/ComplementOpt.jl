@@ -705,7 +705,10 @@ function test_nonlinear_reformulation()
     @variable(model, y >= 0.0)
     @objective(model, Min, x^2 + y^2 - 4*x*y)
     @constraint(model, [sin(x), y] ∈ MOI.Complements(2))
-    set_optimizer(model, () -> MathOptComplements.Optimizer(MOI.Utilities.Model{Float64}))
+    set_optimizer(
+        model,
+        () -> MathOptComplements.Optimizer(MOI.Utilities.Model{Float64}),
+    )
     MOI.Utilities.attach_optimizer(model)
     expected = Model()
     @variable(expected, x >= 0.0)
