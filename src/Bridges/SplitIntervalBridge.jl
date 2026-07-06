@@ -19,6 +19,18 @@ The input function can be any `MOI.AbstractVectorFunction` (the first
 component `x` may be affine or quadratic); only the second component `y`
 must be a variable.
 
+Since the lower bound of `y` is strictly smaller than its upper bound,
+`xp` and `xn` cannot both be nonzero at a feasible point, so
+`xp = max(x, 0)` and `xn = min(x, 0)`. In
+[`MOI.Bridges.final_touch`](@ref), if the activity `x` has a finite upper
+(resp. lower) bound `ub` (resp. `lb`), the bound `xp <= max(ub, 0)`
+(resp. `xn >= min(lb, 0)`) is added. This is done in
+[`MOI.Bridges.final_touch`](@ref) and not in
+`MOI.Bridges.Constraint.bridge_constraint` because the bounds of `x` may
+be set after the constraint is bridged. These bounds are needed by
+[`MOI.Bridges.Constraint.SOS1ToMILPBridge`](@ref) in case the inner solver
+does not support [`MOI.SOS1`](@ref) constraints.
+
 ## Source node
 
 `SplitIntervalBridge` supports:
@@ -35,11 +47,15 @@ must be a variable.
   * [`MOI.VectorOfVariables`](@ref) in
     [`ComplementsWithSetType{MOI.LessThan{T}}`](@ref)
   * `G` in [`MOI.EqualTo{T}`](@ref) (the splitting equality)
+  * [`MOI.VariableIndex`](@ref) in [`MOI.LessThan{T}`](@ref) and
+    [`MOI.VariableIndex`](@ref) in [`MOI.GreaterThan{T}`](@ref)
+    (the bounds on `xp` and `xn`, added in
+    [`MOI.Bridges.final_touch`](@ref) if the activity is bounded)
 
 where `G` is the scalar function type of the first component.
 
 """
-struct SplitIntervalBridge{
+mutable struct SplitIntervalBridge{
     T,
     G<:MOI.AbstractScalarFunction,
     F<:MOI.AbstractVectorFunction,
@@ -57,6 +73,14 @@ struct SplitIntervalBridge{
     xn::MOI.VariableIndex
     func::F
     set::ComplementsWithSetType{MOI.Interval{T}}
+    xp_upper::Union{
+        Nothing,
+        MOI.ConstraintIndex{MOI.VariableIndex,MOI.LessThan{T}},
+    }
+    xn_lower::Union{
+        Nothing,
+        MOI.ConstraintIndex{MOI.VariableIndex,MOI.GreaterThan{T}},
+    }
 end
 
 function MOI.Bridges.Constraint.bridge_constraint(
@@ -110,6 +134,8 @@ function MOI.Bridges.Constraint.bridge_constraint(
         xn,
         func,
         set,
+        nothing,
+        nothing,
     )
 end
 
@@ -151,6 +177,71 @@ function MOI.set(
     return
 end
 
+function _activity_bounds(model, ::Type{T}, x::MOI.VariableIndex) where {T}
+    return MOI.Utilities.get_bounds(model, T, x)
+end
+
+function _activity_bounds(
+    model,
+    ::Type{T},
+    func::MOI.ScalarAffineFunction{T},
+) where {T}
+    f = MOI.Utilities.canonical(func)
+    lb = ub = f.constant
+    for term in f.terms
+        l, u = MOI.Utilities.get_bounds(model, T, term.variable)
+        if term.coefficient >= 0
+            lb += term.coefficient * l
+            ub += term.coefficient * u
+        else
+            lb += term.coefficient * u
+            ub += term.coefficient * l
+        end
+    end
+    return lb, ub
+end
+
+function _activity_bounds(
+    model,
+    ::Type{T},
+    ::MOI.AbstractScalarFunction,
+) where {T}
+    return typemin(T), typemax(T)
+end
+
+MOI.Bridges.needs_final_touch(::SplitIntervalBridge) = true
+
+function MOI.Bridges.final_touch(
+    bridge::SplitIntervalBridge{T},
+    model::MOI.ModelLike,
+) where {T}
+    x = first(MOI.Utilities.eachscalar(bridge.func))
+    lb, ub = _activity_bounds(model, T, x)
+    if isfinite(ub)
+        set = MOI.LessThan(max(ub, zero(T)))
+        if bridge.xp_upper === nothing
+            bridge.xp_upper = MOI.add_constraint(model, bridge.xp, set)
+        elseif MOI.get(model, MOI.ConstraintSet(), bridge.xp_upper) != set
+            MOI.set(model, MOI.ConstraintSet(), bridge.xp_upper, set)
+        end
+    elseif bridge.xp_upper !== nothing
+        MOI.delete(model, bridge.xp_upper)
+        bridge.xp_upper = nothing
+    end
+    if isfinite(lb)
+        set = MOI.GreaterThan(min(lb, zero(T)))
+        if bridge.xn_lower === nothing
+            bridge.xn_lower = MOI.add_constraint(model, bridge.xn, set)
+        elseif MOI.get(model, MOI.ConstraintSet(), bridge.xn_lower) != set
+            MOI.set(model, MOI.ConstraintSet(), bridge.xn_lower, set)
+        end
+    elseif bridge.xn_lower !== nothing
+        MOI.delete(model, bridge.xn_lower)
+        bridge.xn_lower = nothing
+    end
+    return
+end
+
 # Bridge metadata
 
 function MOI.Bridges.added_constrained_variable_types(
@@ -166,6 +257,8 @@ function MOI.Bridges.added_constraint_types(
         (MOI.VectorOfVariables, ComplementsWithSetType{MOI.GreaterThan{T}}),
         (MOI.VectorOfVariables, ComplementsWithSetType{MOI.LessThan{T}}),
         (G, MOI.EqualTo{T}),
+        (MOI.VariableIndex, MOI.GreaterThan{T}),
+        (MOI.VariableIndex, MOI.LessThan{T}),
     ]
 end
 
@@ -181,37 +274,45 @@ end
 # constraints that must be reported as part of the bridge.
 
 function MOI.get(
-    ::SplitIntervalBridge{T},
+    bridge::SplitIntervalBridge{T},
     ::MOI.NumberOfConstraints{MOI.VariableIndex,MOI.GreaterThan{T}},
 )::Int64 where {T}
-    return 1
+    return 1 + (bridge.xn_lower !== nothing)
 end
 
 function MOI.get(
     bridge::SplitIntervalBridge{T},
     ::MOI.ListOfConstraintIndices{MOI.VariableIndex,MOI.GreaterThan{T}},
 ) where {T}
-    return [
+    ret = [
         MOI.ConstraintIndex{MOI.VariableIndex,MOI.GreaterThan{T}}(
             bridge.xp.value,
         ),
     ]
+    if bridge.xn_lower !== nothing
+        push!(ret, bridge.xn_lower)
+    end
+    return ret
 end
 
 function MOI.get(
-    ::SplitIntervalBridge{T},
+    bridge::SplitIntervalBridge{T},
     ::MOI.NumberOfConstraints{MOI.VariableIndex,MOI.LessThan{T}},
 )::Int64 where {T}
-    return 1
+    return 1 + (bridge.xp_upper !== nothing)
 end
 
 function MOI.get(
     bridge::SplitIntervalBridge{T},
     ::MOI.ListOfConstraintIndices{MOI.VariableIndex,MOI.LessThan{T}},
 ) where {T}
-    return [
+    ret = [
         MOI.ConstraintIndex{MOI.VariableIndex,MOI.LessThan{T}}(bridge.xn.value),
     ]
+    if bridge.xp_upper !== nothing
+        push!(ret, bridge.xp_upper)
+    end
+    return ret
 end
 
 function MOI.get(
