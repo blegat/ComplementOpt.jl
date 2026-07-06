@@ -211,12 +211,14 @@ function test_final_touch_bound_modification()
         MathOptComplements.ComplementsWithSetType{MOI.Interval{T}}(2),
     )
     F = MOI.VariableIndex
-    upper_sets(m) =
-        [MOI.get(m, MOI.ConstraintSet(), ci) for
-        ci in MOI.get(m, MOI.ListOfConstraintIndices{F,MOI.LessThan{T}}())]
-    lower_sets(m) =
-        [MOI.get(m, MOI.ConstraintSet(), ci) for
-        ci in MOI.get(m, MOI.ListOfConstraintIndices{F,MOI.GreaterThan{T}}())]
+    upper_sets(m) = [
+        MOI.get(m, MOI.ConstraintSet(), ci) for
+        ci in MOI.get(m, MOI.ListOfConstraintIndices{F,MOI.LessThan{T}}())
+    ]
+    lower_sets(m) = [
+        MOI.get(m, MOI.ConstraintSet(), ci) for ci in
+        MOI.get(m, MOI.ListOfConstraintIndices{F,MOI.GreaterThan{T}}())
+    ]
     # `x` only has a lower bound so no bound is added on `xp` nor `xn`:
     # the only `LessThan` is `xn <= 0` and the `GreaterThan` are `x >= -1`
     # and `xp >= 0`
