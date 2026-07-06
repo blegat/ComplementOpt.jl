@@ -22,14 +22,18 @@ must be a variable.
 Since the lower bound of `y` is strictly smaller than its upper bound,
 `xp` and `xn` cannot both be nonzero at a feasible point, so
 `xp = max(x, 0)` and `xn = min(x, 0)`. In
-[`MOI.Bridges.final_touch`](@ref), if the activity `x` has a finite upper
-(resp. lower) bound `ub` (resp. `lb`), the bound `xp <= max(ub, 0)`
-(resp. `xn >= min(lb, 0)`) is added. This is done in
+[`MOI.Bridges.final_touch`](@ref), if the activity `x` has finite lower
+and upper bounds `[lb, ub]`, the bounds `xp <= max(ub, 0)` and
+`xn >= min(lb, 0)` are added. This is done in
 [`MOI.Bridges.final_touch`](@ref) and not in
 `MOI.Bridges.Constraint.bridge_constraint` because the bounds of `x` may
 be set after the constraint is bridged. These bounds are needed by
 [`MOI.Bridges.Constraint.SOS1ToMILPBridge`](@ref) in case the inner solver
-does not support [`MOI.SOS1`](@ref) constraints.
+does not support [`MOI.SOS1`](@ref) constraints. Since that bridge
+requires both bounds anyway (`xp` and `xn` each appear in an
+[`MOI.SOS1`](@ref) constraint), we use the same
+`MOI.Utilities.get_bounds` method and add nothing when either bound is
+infinite.
 
 ## Source node
 
@@ -177,38 +181,6 @@ function MOI.set(
     return
 end
 
-function _activity_bounds(model, ::Type{T}, x::MOI.VariableIndex) where {T}
-    return MOI.Utilities.get_bounds(model, T, x)
-end
-
-function _activity_bounds(
-    model,
-    ::Type{T},
-    func::MOI.ScalarAffineFunction{T},
-) where {T}
-    f = MOI.Utilities.canonical(func)
-    lb = ub = f.constant
-    for term in f.terms
-        l, u = MOI.Utilities.get_bounds(model, T, term.variable)
-        if term.coefficient >= 0
-            lb += term.coefficient * l
-            ub += term.coefficient * u
-        else
-            lb += term.coefficient * u
-            ub += term.coefficient * l
-        end
-    end
-    return lb, ub
-end
-
-function _activity_bounds(
-    model,
-    ::Type{T},
-    ::MOI.AbstractScalarFunction,
-) where {T}
-    return typemin(T), typemax(T)
-end
-
 MOI.Bridges.needs_final_touch(::SplitIntervalBridge) = true
 
 function MOI.Bridges.final_touch(
@@ -216,28 +188,35 @@ function MOI.Bridges.final_touch(
     model::MOI.ModelLike,
 ) where {T}
     x = first(MOI.Utilities.eachscalar(bridge.func))
-    lb, ub = _activity_bounds(model, T, x)
-    if isfinite(ub)
-        set = MOI.LessThan(max(ub, zero(T)))
-        if bridge.xp_upper === nothing
-            bridge.xp_upper = MOI.add_constraint(model, bridge.xp, set)
-        elseif MOI.get(model, MOI.ConstraintSet(), bridge.xp_upper) != set
-            MOI.set(model, MOI.ConstraintSet(), bridge.xp_upper, set)
-        end
-    elseif bridge.xp_upper !== nothing
-        MOI.delete(model, bridge.xp_upper)
-        bridge.xp_upper = nothing
+    ret = if x isa MOI.VariableIndex || x isa MOI.ScalarAffineFunction{T}
+        cache = Dict{MOI.VariableIndex,NTuple{2,T}}()
+        MOI.Utilities.get_bounds(model, cache, x)
+    else
+        nothing
     end
-    if isfinite(lb)
-        set = MOI.GreaterThan(min(lb, zero(T)))
-        if bridge.xn_lower === nothing
-            bridge.xn_lower = MOI.add_constraint(model, bridge.xn, set)
-        elseif MOI.get(model, MOI.ConstraintSet(), bridge.xn_lower) != set
-            MOI.set(model, MOI.ConstraintSet(), bridge.xn_lower, set)
+    if ret === nothing
+        if bridge.xp_upper !== nothing
+            MOI.delete(model, bridge.xp_upper)
+            bridge.xp_upper = nothing
         end
-    elseif bridge.xn_lower !== nothing
-        MOI.delete(model, bridge.xn_lower)
-        bridge.xn_lower = nothing
+        if bridge.xn_lower !== nothing
+            MOI.delete(model, bridge.xn_lower)
+            bridge.xn_lower = nothing
+        end
+        return
+    end
+    lb, ub = ret
+    upper = MOI.LessThan(max(ub, zero(T)))
+    if bridge.xp_upper === nothing
+        bridge.xp_upper = MOI.add_constraint(model, bridge.xp, upper)
+    elseif MOI.get(model, MOI.ConstraintSet(), bridge.xp_upper) != upper
+        MOI.set(model, MOI.ConstraintSet(), bridge.xp_upper, upper)
+    end
+    lower = MOI.GreaterThan(min(lb, zero(T)))
+    if bridge.xn_lower === nothing
+        bridge.xn_lower = MOI.add_constraint(model, bridge.xn, lower)
+    elseif MOI.get(model, MOI.ConstraintSet(), bridge.xn_lower) != lower
+        MOI.set(model, MOI.ConstraintSet(), bridge.xn_lower, lower)
     end
     return
 end

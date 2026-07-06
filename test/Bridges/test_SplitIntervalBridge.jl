@@ -90,6 +90,9 @@ function test_bounded_activity()
     return
 end
 
+# The bounds on `xp` and `xn` are only needed by `SOS1ToMILPBridge`, which
+# requires both bounds of the activity anyway, so no bound is added when
+# the activity is bounded on only one side.
 function test_upper_bounded_activity()
     MOI.Bridges.runtests(
         MathOptComplements.Bridges.SplitIntervalBridge,
@@ -104,7 +107,6 @@ function test_upper_bounded_activity()
         x <= 4.0
         y in Interval(0.0, 1.0)
         xp >= 0.0
-        xp <= 4.0
         xn <= 0.0
         1.0 * x + -1.0 * xp + -1.0 * xn == 0.0
         [xp, y] in $M.ComplementsWithSetType{MOI.GreaterThan{Float64}}(2)
@@ -130,7 +132,6 @@ function test_lower_bounded_activity()
         y in Interval(0.0, 1.0)
         xp >= 0.0
         xn <= 0.0
-        xn >= -2.0
         1.0 * x + -1.0 * xp + -1.0 * xn == 0.0
         [xp, y] in $M.ComplementsWithSetType{MOI.GreaterThan{Float64}}(2)
         [xn, y] in $M.ComplementsWithSetType{MOI.LessThan{Float64}}(2)
@@ -209,28 +210,43 @@ function test_final_touch_bound_modification()
         MOI.VectorOfVariables([x, y]),
         MathOptComplements.ComplementsWithSetType{MOI.Interval{T}}(2),
     )
-    F, S = MOI.VariableIndex, MOI.LessThan{T}
+    F = MOI.VariableIndex
     upper_sets(m) =
         [MOI.get(m, MOI.ConstraintSet(), ci) for
-        ci in MOI.get(m, MOI.ListOfConstraintIndices{F,S}())]
-    # `x` is unbounded so no upper bound is added on `xp`:
-    # the only `LessThan` is `xn <= 0`
+        ci in MOI.get(m, MOI.ListOfConstraintIndices{F,MOI.LessThan{T}}())]
+    lower_sets(m) =
+        [MOI.get(m, MOI.ConstraintSet(), ci) for
+        ci in MOI.get(m, MOI.ListOfConstraintIndices{F,MOI.GreaterThan{T}}())]
+    # `x` only has a lower bound so no bound is added on `xp` nor `xn`:
+    # the only `LessThan` is `xn <= 0` and the `GreaterThan` are `x >= -1`
+    # and `xp >= 0`
+    MOI.add_constraint(model, x, MOI.GreaterThan(T(-1)))
     MOI.Bridges.final_touch(model)
     @test upper_sets(inner) == [MOI.LessThan(zero(T))]
-    # Adding `x <= 4` adds `xp <= 4` at the next final_touch
+    @test sort(lower_sets(inner); by = s -> s.lower) ==
+          [MOI.GreaterThan(T(-1)), MOI.GreaterThan(zero(T))]
+    # Adding `x <= 4` adds `xp <= 4` and `xn >= -1` at the next final_touch
     c_ub = MOI.add_constraint(model, x, MOI.LessThan(T(4)))
     MOI.Bridges.final_touch(model)
     @test sort(upper_sets(inner); by = s -> s.upper) ==
           [MOI.LessThan(zero(T)), MOI.LessThan(T(4)), MOI.LessThan(T(4))]
+    @test sort(lower_sets(inner); by = s -> s.lower) == [
+        MOI.GreaterThan(T(-1)),
+        MOI.GreaterThan(T(-1)),
+        MOI.GreaterThan(zero(T)),
+    ]
     # Tightening to `x <= 2` updates the bound of `xp`
     MOI.set(model, MOI.ConstraintSet(), c_ub, MOI.LessThan(T(2)))
     MOI.Bridges.final_touch(model)
     @test sort(upper_sets(inner); by = s -> s.upper) ==
           [MOI.LessThan(zero(T)), MOI.LessThan(T(2)), MOI.LessThan(T(2))]
-    # Removing the bound of `x` removes the bound of `xp`
+    # Removing the upper bound of `x` removes the bounds of both `xp`
+    # and `xn`
     MOI.delete(model, c_ub)
     MOI.Bridges.final_touch(model)
     @test upper_sets(inner) == [MOI.LessThan(zero(T))]
+    @test sort(lower_sets(inner); by = s -> s.lower) ==
+          [MOI.GreaterThan(T(-1)), MOI.GreaterThan(zero(T))]
     return
 end
 
