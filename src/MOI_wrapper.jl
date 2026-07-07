@@ -205,13 +205,13 @@ function _sos1_bridge_type(
     return Bridges.ToSOS1Bridge{T}
 end
 
-# VOV-in-Zeros → ToSOS1Bridge (trivial complementarity)
+# VOV-in-Zeros → ToZerosBridge (trivial complementarity: activity is zero)
 function _sos1_bridge_type(
     ::Type{T},
     ::Type{MOI.VectorOfVariables},
     ::Type{MOI.Zeros},
 ) where {T}
-    return Bridges.ToSOS1Bridge{T}
+    return Bridges.ToZerosBridge{T}
 end
 
 # Any non-VOV function → VerticalBridge (create slacks, then re-enter as VOV)

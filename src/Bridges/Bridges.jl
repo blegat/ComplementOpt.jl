@@ -19,6 +19,7 @@ include("SplitIntervalBridge.jl")
 include("FlipSignBridge.jl")
 include("NonlinearBridge.jl")
 include("ToSOS1Bridge.jl")
+include("ToZerosBridge.jl")
 
 """
     add_all_bridges(model::MOI.ModelLike, ::Type{T} = Float64)
@@ -40,6 +41,7 @@ function add_all_bridges(model::MOI.ModelLike, ::Type{T} = Float64) where {T}
     MOI.Bridges.add_bridge(model, SplitIntervalBridge{T})
     MOI.Bridges.add_bridge(model, FlipSignBridge{T})
     MOI.Bridges.add_bridge(model, ToSOS1Bridge{T})
+    MOI.Bridges.add_bridge(model, ToZerosBridge{T})
     MOI.Bridges.add_bridge(model, VerticalBridge{T})
     MOI.Bridges.add_bridge(model, NonlinearBridge{T})
     return
