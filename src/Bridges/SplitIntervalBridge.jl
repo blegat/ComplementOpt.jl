@@ -101,11 +101,9 @@ function MOI.Bridges.Constraint.bridge_constraint(
     y_var = if y isa MOI.VariableIndex
         y
     else
-        # Extract the variable from a ScalarAffineFunction wrapping a single variable
-        @assert length(y.terms) == 1 &&
-                isone(y.terms[1].coefficient) &&
-                iszero(y.constant)
-        y.terms[1].variable
+        # Extract the variable from a function wrapping a single variable
+        @assert _is_single_variable(y)
+        _get_variable(y)
     end
     # Create xp >= 0 and xn <= 0
     xp, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(zero(T)))
