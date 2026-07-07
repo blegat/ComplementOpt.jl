@@ -197,13 +197,15 @@ function test_Optimizer_bridge_dispatch()
         MOI.VectorAffineFunction{Float64},
         S,
     ) == MathOptComplements.Bridges.NonlinearBridge{Float64,MOI.Nonnegatives}
-    # SOS1 path: VectorOfVariables in ComplementsWithSetType{Zeros} → ToSOS1Bridge
+    # SOS1 path: VectorOfVariables in ComplementsWithSetType{Zeros} →
+    # ToZerosBridge (the activity is complementary to a fixed/free variable, so
+    # it is forced to zero).
     opt_sos1 = MathOptComplements.Optimizer(
         MOI.Bridges.full_bridge_optimizer(HiGHS.Optimizer(), Float64),
     )
     S_zeros = MathOptComplements.ComplementsWithSetType{MOI.Zeros}
     @test MOI.Bridges.bridge_type(opt_sos1, MOI.VectorOfVariables, S_zeros) ==
-          MathOptComplements.Bridges.ToSOS1Bridge{Float64}
+          MathOptComplements.Bridges.ToZerosBridge{Float64}
     return
 end
 
