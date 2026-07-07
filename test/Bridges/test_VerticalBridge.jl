@@ -58,6 +58,49 @@ function test_Expression_LHS_with_constant_ComplementsWithSetType()
     return
 end
 
+function test_Expression_RHS_with_constant_ComplementsWithSetType()
+    # The right-hand side `1.0 * y + 2.0` is not a single variable (it appears
+    # after `ComplementsVectorizeBridge` shifts the second variable by a nonzero
+    # bound), so a slack `s == y + 2` is introduced.
+    MOI.Bridges.runtests(
+        MathOptComplements.Bridges.VerticalBridge,
+        """
+        variables: x, y
+        x >= 0.0
+        [1.0 * x, 1.0 * y + 2.0] in $M.ComplementsWithSetType{MOI.Nonnegatives}(2)
+        """,
+        """
+        variables: x, y, s
+        x >= 0.0
+        1.0 * y + -1.0 * s == -2.0
+        [x, s] in $M.ComplementsWithSetType{MOI.Nonnegatives}(2)
+        """;
+        cannot_unbridge = true,
+    )
+    return
+end
+
+function test_Expression_LHS_and_RHS_ComplementsWithSetType()
+    # Both components are expressions, so two slacks are introduced. The
+    # right-hand side is resolved first, so its slack `s_rhs` is added before the
+    # left-hand side slack `s_lhs`.
+    MOI.Bridges.runtests(
+        MathOptComplements.Bridges.VerticalBridge,
+        """
+        variables: x, y
+        [2.0 * x + 3.0, 1.0 * y + 2.0] in $M.ComplementsWithSetType{MOI.Nonnegatives}(2)
+        """,
+        """
+        variables: x, y, s_rhs, s_lhs
+        1.0 * y + -1.0 * s_rhs == -2.0
+        2.0 * x + -1.0 * s_lhs == -3.0
+        [s_lhs, s_rhs] in $M.ComplementsWithSetType{MOI.Nonnegatives}(2)
+        """;
+        cannot_unbridge = true,
+    )
+    return
+end
+
 end  # TestVerticalBridge
 
 TestVerticalBridge.runtests()

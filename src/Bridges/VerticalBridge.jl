@@ -209,6 +209,15 @@ _get_variable(func::MOI.ScalarQuadraticFunction) = func.affine_terms[1].variable
 
 _get_variable(func::MOI.ScalarNonlinearFunction) = func.args[1]
 
+# A single variable shifted by a constant, e.g. `x - 1`. Such a right-hand side
+# is produced by `ComplementsVectorizeBridge` when it shifts the second variable
+# by a nonzero bound.
+function _is_shifted_variable(func::MOI.ScalarAffineFunction)
+    return length(func.terms) == 1 && isone(func.terms[1].coefficient)
+end
+
+_is_shifted_variable(::MOI.AbstractScalarFunction) = false
+
 # TODO: add support for ScalarNonlinearTerm
 function _parse_complementarity_constraint(
     fun::MOI.AbstractVectorFunction,
@@ -216,30 +225,44 @@ function _parse_complementarity_constraint(
 )
     exprs = MOI.Utilities.scalarize(fun)
     @assert length(exprs) == 2*n_comp
-    cc_lhs = MOI.AbstractScalarFunction[]
-    cc_rhs = MOI.VariableIndex[]
-    for i in 1:n_comp
-        # Parse LHS
-        t1 = exprs[i]
-        t2 = exprs[i+n_comp]
-        if _is_single_variable(t1)
-            push!(cc_lhs, _get_variable(t1))
-        else
-            push!(cc_lhs, t1)
-        end
-        # Parse RHS
-        isvar2 = _is_single_variable(t2)
-        if !isvar2
-            # The RHS should be a variable if we follow MOI's specs
-            # TODO: we should decide if we should add support complementarity
-            # between expressions (see Issue #2)
-            error(
-                "Right-hand-side should be a single variable in complementarity constraints.",
-            )
-        end
-        push!(cc_rhs, _get_variable(t2))
-    end
+    cc_lhs = MOI.AbstractScalarFunction[exprs[i] for i in 1:n_comp]
+    cc_rhs = MOI.AbstractScalarFunction[exprs[i+n_comp] for i in 1:n_comp]
     return cc_lhs, cc_rhs
+end
+
+# Return a single variable representing `expr`. If `expr` is already a single
+# variable, it is returned directly. Otherwise, a slack variable `s` is created
+# together with the equality `expr == s` and `s` is returned.
+function _to_variable!(model, ::Type{T}, expr, slacks, equalities) where {T}
+    if _is_single_variable(expr)
+        return _get_variable(expr)
+    end
+    s = MOI.add_variable(model)
+    push!(slacks, s)
+    new_expr = MOI.Utilities.operate(-, T, expr, s)
+    push!(
+        equalities,
+        MOI.Utilities.normalize_and_add_constraint(
+            model,
+            new_expr,
+            MOI.EqualTo{T}(zero(T)),
+        ),
+    )
+    return s
+end
+
+# Resolve the right-hand side of a complementarity constraint to a single
+# variable. Following MOI's specs, it should be a single variable, but it may be
+# a single variable shifted by a constant (introduced by
+# `ComplementsVectorizeBridge`), in which case a slack is added. Genuine
+# multi-variable expressions are not supported (see Issue #2).
+function _rhs_variable!(model, ::Type{T}, expr, slacks, equalities) where {T}
+    if !_is_single_variable(expr) && !_is_shifted_variable(expr)
+        error(
+            "Right-hand-side should be a single variable in complementarity constraints.",
+        )
+    end
+    return _to_variable!(model, T, expr, slacks, equalities)
 end
 
 """
@@ -265,7 +288,8 @@ function reformulate_to_vertical!(
     @assert !(fun isa MOI.VectorOfVariables)
     # Read each complementarity constraint and get corresponding indices
     cc_lhs, cc_rhs = _parse_complementarity_constraint(fun, n_comp)
-    for (lhs, x2) in zip(cc_lhs, cc_rhs)
+    for (lhs, rhs) in zip(cc_lhs, cc_rhs)
+        x2 = _rhs_variable!(model, T, rhs, slacks, equalities)
         if set isa MOI.Complements
             # Check if x2 is bounded.
             lb, ub = MOI.Utilities.get_bounds(model, T, x2)
@@ -282,28 +306,12 @@ function reformulate_to_vertical!(
                 continue
             end
         end
-        if isa(lhs, MOI.VariableIndex)
-            # If lhs is a variable, no need to reformulate the
-            # complementarity constraint using a slack.
-            # TODO: we should check if the variable lhs is bounded.
-            push!(ind_cc1, lhs)
-            push!(ind_cc2, x2)
-        else
-            # Else, reformulate LHS using vertical form
-            x1 = MOI.add_variable(model)
-            push!(slacks, x1)
-            new_lhs = MOI.Utilities.operate!(-, T, lhs, x1)
-            push!(
-                equalities,
-                MOI.Utilities.normalize_and_add_constraint(
-                    model,
-                    new_lhs,
-                    MOI.EqualTo{T}(zero(T)),
-                ),
-            )
-            push!(ind_cc1, x1)
-            push!(ind_cc2, x2)
-        end
+        # If lhs is a variable, no need to reformulate the complementarity
+        # constraint using a slack.
+        # TODO: we should check if the variable lhs is bounded.
+        x1 = _to_variable!(model, T, lhs, slacks, equalities)
+        push!(ind_cc1, x1)
+        push!(ind_cc2, x2)
     end
     n_cc = length(ind_cc1)
     comp = MOI.VectorOfVariables([ind_cc1; ind_cc2])
