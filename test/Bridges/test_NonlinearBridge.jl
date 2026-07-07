@@ -230,6 +230,63 @@ function test_KS_Nonpositives_with_unbounded_x1()
     return
 end
 
+# `MOI.Bridges.runtests` cannot catch an under-specified
+# `added_constraint_types`: its `_general_bridge_tests` only iterates over the
+# *declared* types to check consistency, so it never verifies that every
+# constraint actually added by the bridge is declared. We check that here
+# explicitly for each relaxation, since the produced constraint types depend on
+# the relaxation (quadratic for Scholtes/Liu-Fukushima, nonlinear for
+# Fischer-Burmeister/Kanzow-Schwarz).
+function _test_added_constraint_types(relax)
+    T = Float64
+    inner = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{T}())
+    B = MathOptComplements.Bridges.NonlinearBridge{T}
+    model = MOI.Bridges.Constraint.SingleBridgeOptimizer{B}(inner)
+    x1 = MOI.add_variable(model)
+    x2, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(zero(T)))
+    ci = MOI.add_constraint(
+        model,
+        MOI.VectorOfVariables([x1, x2]),
+        MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}(2),
+    )
+    if relax !== nothing
+        MOI.set(
+            model,
+            MathOptComplements.ComplementarityReformulation(),
+            ci,
+            relax,
+        )
+    end
+    MOI.Bridges.final_touch(model)
+    CB = MathOptComplements.Bridges.NonlinearBridge{T,MOI.Nonnegatives}
+    # The bridge adds no variable, so `added_constrained_variable_types` is
+    # empty.
+    @test isempty(MOI.Bridges.added_constrained_variable_types(CB))
+    declared = MOI.Bridges.added_constraint_types(CB)
+    for (F, S) in MOI.get(inner, MOI.ListOfConstraintTypesPresent())
+        # The bound on `x2` is added by the test, not by the bridge.
+        if F == MOI.VariableIndex
+            continue
+        end
+        @test (F, S) in declared
+    end
+    return
+end
+
+function test_added_constraint_types()
+    _test_added_constraint_types(nothing)  # ScholtesRelaxation (the default)
+    _test_added_constraint_types(
+        MathOptComplements.FischerBurmeisterRelaxation(1e-8),
+    )
+    _test_added_constraint_types(
+        MathOptComplements.LiuFukushimaRelaxation(1e-8),
+    )
+    _test_added_constraint_types(
+        MathOptComplements.KanzowSchwarzRelaxation(1e-8),
+    )
+    return
+end
+
 function test_Zeros_equality()
     MOI.Bridges.runtests(
         MathOptComplements.Bridges.NonlinearBridge,

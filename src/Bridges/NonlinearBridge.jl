@@ -29,7 +29,11 @@ The relaxation method is determined by the
 ## Target nodes
 
 `NonlinearBridge` creates nonlinear constraints depending on the relaxation
-method (for example, quadratic or `ScalarNonlinearFunction` constraints).
+method:
+
+  * [`MOI.ScalarQuadraticFunction{T}`](@ref) in [`MOI.LessThan{T}`](@ref)
+  * [`MOI.ScalarQuadraticFunction{T}`](@ref) in [`MOI.GreaterThan{T}`](@ref)
+  * [`MOI.ScalarNonlinearFunction`](@ref) in [`MOI.LessThan{T}`](@ref)
 """
 mutable struct NonlinearBridge{T,S} <: MOI.Bridges.Constraint.AbstractBridge
     constraints::Vector
@@ -100,8 +104,21 @@ function MOI.Bridges.added_constrained_variable_types(::Type{<:NonlinearBridge})
     return Tuple{Type}[]
 end
 
-function MOI.Bridges.added_constraint_types(::Type{<:NonlinearBridge})
-    return Tuple{Type,Type}[]
+function MOI.Bridges.added_constraint_types(
+    ::Type{<:NonlinearBridge{T}},
+) where {T}
+    # The reformulation produces, depending on the relaxation method:
+    #  * `ScalarQuadraticFunction`-in-`LessThan` (Scholtes, Liu-Fukushima)
+    #  * `ScalarQuadraticFunction`-in-`GreaterThan` (Liu-Fukushima)
+    #  * `ScalarNonlinearFunction`-in-`LessThan`
+    #    (Fischer-Burmeister, Kanzow-Schwarz)
+    # Since the relaxation is an instance attribute and not part of the bridge
+    # type, we declare the union of all the constraint types that may be added.
+    return Tuple{Type,Type}[
+        (MOI.ScalarQuadraticFunction{T}, MOI.LessThan{T}),
+        (MOI.ScalarQuadraticFunction{T}, MOI.GreaterThan{T}),
+        (MOI.ScalarNonlinearFunction, MOI.LessThan{T}),
+    ]
 end
 
 function MOI.get(
