@@ -21,6 +21,17 @@ include("NonlinearBridge.jl")
 include("ToSOS1Bridge.jl")
 include("ToZerosBridge.jl")
 
+const _ALL_BRIDGE_TYPES = Any[
+    SpecifySetTypeBridge,
+    ComplementsVectorizeBridge,
+    SplitIntervalBridge,
+    FlipSignBridge,
+    ToSOS1Bridge,
+    ToZerosBridge,
+    VerticalBridge,
+    NonlinearBridge,
+]
+
 """
     add_all_bridges(model::MOI.ModelLike, ::Type{T} = Float64)
 
@@ -36,14 +47,9 @@ the default [`ScholtesRelaxation`](@ref) because the
 attribute is only supported by [`MathOptComplements.Optimizer`](@ref).
 """
 function add_all_bridges(model::MOI.ModelLike, ::Type{T} = Float64) where {T}
-    MOI.Bridges.add_bridge(model, SpecifySetTypeBridge{T})
-    MOI.Bridges.add_bridge(model, ComplementsVectorizeBridge{T})
-    MOI.Bridges.add_bridge(model, SplitIntervalBridge{T})
-    MOI.Bridges.add_bridge(model, FlipSignBridge{T})
-    MOI.Bridges.add_bridge(model, ToSOS1Bridge{T})
-    MOI.Bridges.add_bridge(model, ToZerosBridge{T})
-    MOI.Bridges.add_bridge(model, VerticalBridge{T})
-    MOI.Bridges.add_bridge(model, NonlinearBridge{T})
+    for bridge_type in _ALL_BRIDGE_TYPES
+        MOI.Bridges.add_bridge(model, bridge_type{T})
+    end
     return
 end
 

@@ -12,3 +12,9 @@ is_test(f) = startswith(f, "test_") && endswith(f, ".jl")
         include(joinpath(root, file))
     end
 end
+
+# Integration test that is not named `test_*.jl` so that it is not picked up by
+# the `walkdir` above; it is included explicitly here.
+@testset "Bridges/lazy.jl" begin
+    include(joinpath(@__DIR__, "Bridges", "lazy.jl"))
+end
