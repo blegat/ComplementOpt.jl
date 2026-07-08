@@ -309,7 +309,12 @@ function test_ComplementarityReformulation_through_SplitInterval_before_final_to
         MathOptComplements.ComplementsWithSetType{MOI.Interval{Float64}}(2),
     )
     attr = MathOptComplements.ComplementarityReformulation()
-    MOI.set(model, attr, ci, MathOptComplements.FischerBurmeisterRelaxation(1e-8))
+    MOI.set(
+        model,
+        attr,
+        ci,
+        MathOptComplements.FischerBurmeisterRelaxation(1e-8),
+    )
     MOI.Bridges.final_touch(model)
     MOI.Bridges.final_touch(nl_model)
     # Fischer-Burmeister → nonlinear constraints (not the default quadratic).
