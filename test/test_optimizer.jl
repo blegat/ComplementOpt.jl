@@ -404,6 +404,30 @@ function test_bridge_chain()
     return
 end
 
+function test_interval_complements_solve_HiGHS()
+    # End-to-end solve through the SOS1/MILP path (HiGHS has no native SOS1 nor
+    # nonlinear support). The interval bound `0 <= z <= 1e3` makes the second
+    # component be shifted, so `VerticalBridge` introduces a slack that must be
+    # given finite bounds for `SOS1ToMILPBridge` to apply.
+    model = Model(
+        () -> MathOptComplements.Optimizer(
+            MOI.instantiate(HiGHS.Optimizer; with_bridge_type = Float64),
+        ),
+    )
+    set_silent(model)
+    @variable(model, 0 <= z[1:2] <= 1e3)
+    @variable(model, z3)
+    @objective(model, Min, sum(z) - z3)
+    @constraint(model, z3 .<= 4 .* z)
+    @constraint(model, z in MOI.Complements(2))
+    optimize!(model)
+    @test is_solved_and_feasible(model)
+    @test isapprox(objective_value(model), 0.0; atol = 1e-6)
+    @test isapprox(value.(z), [0.0, 0.0]; atol = 1e-6)
+    @test isapprox(value(z3), 0.0; atol = 1e-6)
+    return
+end
+
 function test_add_all_bridges_JuMP_GenericModel()
     model = Model(Ipopt.Optimizer)
     MathOptComplements.Bridges.add_all_bridges(model)

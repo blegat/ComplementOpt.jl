@@ -179,6 +179,17 @@ function MOI.set(
     return
 end
 
+# The bounds of the activity `x`, or `nothing` if they cannot be computed or the
+# domain is not bounded. `get_bounds` is only defined for affine functions and
+# variables.
+function _activity_bounds(model, ::Type{T}, x) where {T}
+    if x isa MOI.VariableIndex || x isa MOI.ScalarAffineFunction{T}
+        cache = Dict{MOI.VariableIndex,NTuple{2,T}}()
+        return MOI.Utilities.get_bounds(model, cache, x)
+    end
+    return nothing
+end
+
 MOI.Bridges.needs_final_touch(::SplitIntervalBridge) = true
 
 function MOI.Bridges.final_touch(
@@ -186,12 +197,7 @@ function MOI.Bridges.final_touch(
     model::MOI.ModelLike,
 ) where {T}
     x = first(MOI.Utilities.eachscalar(bridge.func))
-    ret = if x isa MOI.VariableIndex || x isa MOI.ScalarAffineFunction{T}
-        cache = Dict{MOI.VariableIndex,NTuple{2,T}}()
-        MOI.Utilities.get_bounds(model, cache, x)
-    else
-        nothing
-    end
+    ret = _activity_bounds(model, T, x)
     if ret === nothing
         if bridge.xp_upper !== nothing
             MOI.delete(model, bridge.xp_upper)

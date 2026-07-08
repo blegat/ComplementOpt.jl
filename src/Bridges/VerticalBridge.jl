@@ -36,6 +36,11 @@ struct VerticalBridge{T,S<:MOI.AbstractVectorSet} <:
     constraint::MOI.ConstraintIndex{MOI.VectorOfVariables,S}
     equalities::Vector{MOI.ConstraintIndex}
     slacks::Vector{MOI.VariableIndex}
+    # Slacks that should be bounded in `final_touch`, together with the
+    # expression they are equal to, so that their bounds can be computed once the
+    # bounds of the underlying variables are set.
+    slacks_to_bound::Vector{Tuple{MOI.VariableIndex,MOI.AbstractScalarFunction}}
+    bounds::Vector{MOI.ConstraintIndex{MOI.VariableIndex,MOI.Interval{T}}}
 end
 
 function MOI.Bridges.Constraint.bridge_constraint(
@@ -44,8 +49,16 @@ function MOI.Bridges.Constraint.bridge_constraint(
     func::MOI.AbstractVectorFunction,
     set::MOI.Complements,
 ) where {T}
-    ci, equalities, slacks = reformulate_to_vertical!(model, T, func, set)
-    return VerticalBridge{T,MOI.Complements}(ci, equalities, slacks)
+    ci, equalities, slacks, slacks_to_bound =
+        reformulate_to_vertical!(model, T, func, set)
+    bounds = MOI.ConstraintIndex{MOI.VariableIndex,MOI.Interval{T}}[]
+    return VerticalBridge{T,MOI.Complements}(
+        ci,
+        equalities,
+        slacks,
+        slacks_to_bound,
+        bounds,
+    )
 end
 
 function MOI.Bridges.Constraint.bridge_constraint(
@@ -54,8 +67,16 @@ function MOI.Bridges.Constraint.bridge_constraint(
     func::MOI.AbstractVectorFunction,
     set::ComplementsWithSetType{S},
 ) where {T,S}
-    ci, equalities, slacks = reformulate_to_vertical!(model, T, func, set)
-    return VerticalBridge{T,ComplementsWithSetType{S}}(ci, equalities, slacks)
+    ci, equalities, slacks, slacks_to_bound =
+        reformulate_to_vertical!(model, T, func, set)
+    bounds = MOI.ConstraintIndex{MOI.VariableIndex,MOI.Interval{T}}[]
+    return VerticalBridge{T,ComplementsWithSetType{S}}(
+        ci,
+        equalities,
+        slacks,
+        slacks_to_bound,
+        bounds,
+    )
 end
 
 function MOI.supports_constraint(
@@ -102,6 +123,7 @@ function MOI.Bridges.added_constraint_types(
     return Tuple{Type,Type}[
         (MOI.VectorOfVariables, S),
         (MOI.ScalarAffineFunction{T}, MOI.EqualTo{T}),
+        (MOI.VariableIndex, MOI.Interval{T}),
     ]
 end
 
@@ -149,16 +171,32 @@ function MOI.get(
     ]
 end
 
+function MOI.get(
+    bridge::VerticalBridge{T},
+    ::MOI.NumberOfConstraints{MOI.VariableIndex,MOI.Interval{T}},
+)::Int64 where {T}
+    return length(bridge.bounds)
+end
+
+function MOI.get(
+    bridge::VerticalBridge{T},
+    ::MOI.ListOfConstraintIndices{MOI.VariableIndex,MOI.Interval{T}},
+) where {T}
+    return copy(bridge.bounds)
+end
+
 function MOI.delete(model::MOI.ModelLike, bridge::VerticalBridge)
     MOI.delete(model, bridge.constraint)
     for ci in bridge.equalities
         MOI.delete(model, ci)
     end
+    # The bounds are deleted together with the slack variables below.
     for vi in bridge.slacks
         MOI.delete(model, vi)
     end
     return
 end
+
 
 function MOI.supports(
     ::MOI.ModelLike,
@@ -209,15 +247,6 @@ _get_variable(func::MOI.ScalarQuadraticFunction) = func.affine_terms[1].variable
 
 _get_variable(func::MOI.ScalarNonlinearFunction) = func.args[1]
 
-# A single variable shifted by a constant, e.g. `x - 1`. Such a right-hand side
-# is produced by `ComplementsVectorizeBridge` when it shifts the second variable
-# by a nonzero bound.
-function _is_shifted_variable(func::MOI.ScalarAffineFunction)
-    return length(func.terms) == 1 && isone(func.terms[1].coefficient)
-end
-
-_is_shifted_variable(::MOI.AbstractScalarFunction) = false
-
 # TODO: add support for ScalarNonlinearTerm
 function _parse_complementarity_constraint(
     fun::MOI.AbstractVectorFunction,
@@ -230,15 +259,43 @@ function _parse_complementarity_constraint(
     return cc_lhs, cc_rhs
 end
 
+# The bounds of `expr`, or `nothing` if they cannot be computed or the domain is
+# not bounded. `get_bounds` is only defined for affine functions and variables.
+function _expr_bounds(
+    model,
+    ::Type{T},
+    expr::Union{MOI.VariableIndex,MOI.ScalarAffineFunction{T}},
+) where {T}
+    cache = Dict{MOI.VariableIndex,NTuple{2,T}}()
+    return MOI.Utilities.get_bounds(model, cache, expr)
+end
+
+_expr_bounds(model, ::Type{T}, ::MOI.AbstractScalarFunction) where {T} = nothing
+
 # Return a single variable representing `expr`. If `expr` is already a single
 # variable, it is returned directly. Otherwise, a slack variable `s` is created
-# together with the equality `expr == s` and `s` is returned.
-function _to_variable!(model, ::Type{T}, expr, slacks, equalities) where {T}
+# together with the equality `expr == s` and `s` is returned. When `add_bounds`
+# is `true`, the bounds of `expr` are propagated to `s` so that bridges requiring
+# a finite domain (e.g. `SOS1ToMILPBridge`) can be applied. This is only done for
+# `ComplementsWithSetType` constraints; for `MOI.Complements`, the bound on the
+# activity is added by `SpecifySetTypeBridge` instead.
+function _to_variable!(
+    model,
+    ::Type{T},
+    expr,
+    slacks,
+    equalities,
+    slacks_to_bound,
+    add_bounds,
+) where {T}
     if _is_single_variable(expr)
         return _get_variable(expr)
     end
     s = MOI.add_variable(model)
     push!(slacks, s)
+    if add_bounds
+        push!(slacks_to_bound, (s, expr))
+    end
     new_expr = MOI.Utilities.operate(-, T, expr, s)
     push!(
         equalities,
@@ -252,17 +309,35 @@ function _to_variable!(model, ::Type{T}, expr, slacks, equalities) where {T}
 end
 
 # Resolve the right-hand side of a complementarity constraint to a single
-# variable. Following MOI's specs, it should be a single variable, but it may be
-# a single variable shifted by a constant (introduced by
-# `ComplementsVectorizeBridge`), in which case a slack is added. Genuine
-# multi-variable expressions are not supported (see Issue #2).
-function _rhs_variable!(model, ::Type{T}, expr, slacks, equalities) where {T}
-    if !_is_single_variable(expr) && !_is_shifted_variable(expr)
+# variable. For a `MOI.Complements` set, MOI's specs require it to be a single
+# variable. For a `ComplementsWithSetType`, it may be any expression (e.g. a
+# variable shifted by a nonzero bound by `ComplementsVectorizeBridge`), in which
+# case a slack is added, with the bounds of the expression so that the
+# `ComplementsWithSetType` set remains enforceable on the slack.
+function _rhs_variable!(
+    model,
+    ::Type{T},
+    expr,
+    set,
+    slacks,
+    equalities,
+    slacks_to_bound,
+) where {T}
+    if set isa MOI.Complements && !_is_single_variable(expr)
         error(
             "Right-hand-side should be a single variable in complementarity constraints.",
         )
     end
-    return _to_variable!(model, T, expr, slacks, equalities)
+    add_bounds = !(set isa MOI.Complements)
+    return _to_variable!(
+        model,
+        T,
+        expr,
+        slacks,
+        equalities,
+        slacks_to_bound,
+        add_bounds,
+    )
 end
 
 """
@@ -283,13 +358,24 @@ function reformulate_to_vertical!(
 ) where {T}
     equalities = MOI.ConstraintIndex[]
     slacks = MOI.VariableIndex[]
+    slacks_to_bound =
+        Tuple{MOI.VariableIndex,MOI.AbstractScalarFunction}[]
+    add_bounds = !(set isa MOI.Complements)
     ind_cc1, ind_cc2 = MOI.VariableIndex[], MOI.VariableIndex[]
     n_comp = div(set.dimension, 2)
     @assert !(fun isa MOI.VectorOfVariables)
     # Read each complementarity constraint and get corresponding indices
     cc_lhs, cc_rhs = _parse_complementarity_constraint(fun, n_comp)
     for (lhs, rhs) in zip(cc_lhs, cc_rhs)
-        x2 = _rhs_variable!(model, T, rhs, slacks, equalities)
+        x2 = _rhs_variable!(
+            model,
+            T,
+            rhs,
+            set,
+            slacks,
+            equalities,
+            slacks_to_bound,
+        )
         if set isa MOI.Complements
             # Check if x2 is bounded.
             lb, ub = MOI.Utilities.get_bounds(model, T, x2)
@@ -309,7 +395,15 @@ function reformulate_to_vertical!(
         # If lhs is a variable, no need to reformulate the complementarity
         # constraint using a slack.
         # TODO: we should check if the variable lhs is bounded.
-        x1 = _to_variable!(model, T, lhs, slacks, equalities)
+        x1 = _to_variable!(
+            model,
+            T,
+            lhs,
+            slacks,
+            equalities,
+            slacks_to_bound,
+            add_bounds,
+        )
         push!(ind_cc1, x1)
         push!(ind_cc2, x2)
     end
@@ -321,5 +415,5 @@ function reformulate_to_vertical!(
     else
         ci = MOI.add_constraint(model, comp, S(2*n_cc))
     end
-    return ci, equalities, slacks
+    return ci, equalities, slacks, slacks_to_bound
 end
