@@ -64,13 +64,22 @@ mutable struct SplitIntervalBridge{
     G<:MOI.AbstractScalarFunction,
     F<:MOI.AbstractVectorFunction,
 } <: MOI.Bridges.Constraint.AbstractBridge
-    lower::MOI.ConstraintIndex{
-        MOI.VectorOfVariables,
-        ComplementsWithSetType{MOI.GreaterThan{T}},
+    # `lower` and `upper` are created in `final_touch` (after `xp`/`xn` are
+    # bounded) so that the bridges they trigger (e.g. `VerticalBridge`) see the
+    # finite bounds. They are `nothing` until then.
+    lower::Union{
+        Nothing,
+        MOI.ConstraintIndex{
+            MOI.VectorOfVariables,
+            ComplementsWithSetType{MOI.GreaterThan{T}},
+        },
     }
-    upper::MOI.ConstraintIndex{
-        MOI.VectorOfVariables,
-        ComplementsWithSetType{MOI.LessThan{T}},
+    upper::Union{
+        Nothing,
+        MOI.ConstraintIndex{
+            MOI.VectorOfVariables,
+            ComplementsWithSetType{MOI.LessThan{T}},
+        },
     }
     equality::MOI.ConstraintIndex{G,MOI.EqualTo{T}}
     xp::MOI.VariableIndex
@@ -85,6 +94,7 @@ mutable struct SplitIntervalBridge{
         Nothing,
         MOI.ConstraintIndex{MOI.VariableIndex,MOI.GreaterThan{T}},
     }
+    reformulation::Union{Nothing,AbstractComplementarityRelaxation}
 end
 
 function MOI.Bridges.Constraint.bridge_constraint(
@@ -116,26 +126,16 @@ function MOI.Bridges.Constraint.bridge_constraint(
         eq_func,
         MOI.EqualTo(zero(T)),
     )
-    # [xp, y] in ComplementsWithSetType{GreaterThan{T}}
-    lower = MOI.add_constraint(
-        model,
-        MOI.VectorOfVariables([xp, y_var]),
-        ComplementsWithSetType{MOI.GreaterThan{T}}(2),
-    )
-    # [xn, y] in ComplementsWithSetType{LessThan{T}}
-    upper = MOI.add_constraint(
-        model,
-        MOI.VectorOfVariables([xn, y_var]),
-        ComplementsWithSetType{MOI.LessThan{T}}(2),
-    )
+    # `lower` and `upper` are created in `final_touch`, once `xp`/`xn` are bounded.
     return SplitIntervalBridge{T,G,typeof(func)}(
-        lower,
-        upper,
+        nothing,
+        nothing,
         equality,
         xp,
         xn,
         func,
         set,
+        nothing,
         nothing,
         nothing,
     )
@@ -174,9 +174,25 @@ function MOI.set(
     bridge::SplitIntervalBridge,
     value::AbstractComplementarityRelaxation,
 )
-    MOI.set(model, attr, bridge.lower, value)
-    MOI.set(model, attr, bridge.upper, value)
+    bridge.reformulation = value
+    if bridge.lower !== nothing
+        MOI.set(model, attr, bridge.lower, value)
+    end
+    if bridge.upper !== nothing
+        MOI.set(model, attr, bridge.upper, value)
+    end
     return
+end
+
+# The bounds of the activity `x`, or `nothing` if they cannot be computed or the
+# domain is not bounded. `get_bounds` is only defined for affine functions and
+# variables.
+function _activity_bounds(model, ::Type{T}, x) where {T}
+    if x isa MOI.VariableIndex || x isa MOI.ScalarAffineFunction{T}
+        cache = Dict{MOI.VariableIndex,NTuple{2,T}}()
+        return MOI.Utilities.get_bounds(model, cache, x)
+    end
+    return nothing
 end
 
 MOI.Bridges.needs_final_touch(::SplitIntervalBridge) = true
@@ -185,13 +201,11 @@ function MOI.Bridges.final_touch(
     bridge::SplitIntervalBridge{T},
     model::MOI.ModelLike,
 ) where {T}
-    x = first(MOI.Utilities.eachscalar(bridge.func))
-    ret = if x isa MOI.VariableIndex || x isa MOI.ScalarAffineFunction{T}
-        cache = Dict{MOI.VariableIndex,NTuple{2,T}}()
-        MOI.Utilities.get_bounds(model, cache, x)
-    else
-        nothing
-    end
+    # Bound `xp` and `xn` from the activity bounds. This is done before creating
+    # `lower`/`upper` below so that the bridges they trigger (e.g.
+    # `VerticalBridge`) can compute the bounds of the slacks they introduce.
+    ret =
+        _activity_bounds(model, T, first(MOI.Utilities.eachscalar(bridge.func)))
     if ret === nothing
         if bridge.xp_upper !== nothing
             MOI.delete(model, bridge.xp_upper)
@@ -201,20 +215,51 @@ function MOI.Bridges.final_touch(
             MOI.delete(model, bridge.xn_lower)
             bridge.xn_lower = nothing
         end
-        return
+    else
+        lb, ub = ret
+        upper = MOI.LessThan(max(ub, zero(T)))
+        if bridge.xp_upper === nothing
+            bridge.xp_upper = MOI.add_constraint(model, bridge.xp, upper)
+        elseif MOI.get(model, MOI.ConstraintSet(), bridge.xp_upper) != upper
+            MOI.set(model, MOI.ConstraintSet(), bridge.xp_upper, upper)
+        end
+        lower = MOI.GreaterThan(min(lb, zero(T)))
+        if bridge.xn_lower === nothing
+            bridge.xn_lower = MOI.add_constraint(model, bridge.xn, lower)
+        elseif MOI.get(model, MOI.ConstraintSet(), bridge.xn_lower) != lower
+            MOI.set(model, MOI.ConstraintSet(), bridge.xn_lower, lower)
+        end
     end
-    lb, ub = ret
-    upper = MOI.LessThan(max(ub, zero(T)))
-    if bridge.xp_upper === nothing
-        bridge.xp_upper = MOI.add_constraint(model, bridge.xp, upper)
-    elseif MOI.get(model, MOI.ConstraintSet(), bridge.xp_upper) != upper
-        MOI.set(model, MOI.ConstraintSet(), bridge.xp_upper, upper)
-    end
-    lower = MOI.GreaterThan(min(lb, zero(T)))
-    if bridge.xn_lower === nothing
-        bridge.xn_lower = MOI.add_constraint(model, bridge.xn, lower)
-    elseif MOI.get(model, MOI.ConstraintSet(), bridge.xn_lower) != lower
-        MOI.set(model, MOI.ConstraintSet(), bridge.xn_lower, lower)
+    # Create the two complementarity constraints (only once).
+    if bridge.lower === nothing
+        y_var = MOI.Utilities.scalarize(bridge.func)[2]
+        if !(y_var isa MOI.VariableIndex)
+            y_var = _get_variable(y_var)
+        end
+        bridge.lower = MOI.add_constraint(
+            model,
+            MOI.VectorOfVariables([bridge.xp, y_var]),
+            ComplementsWithSetType{MOI.GreaterThan{T}}(2),
+        )
+        bridge.upper = MOI.add_constraint(
+            model,
+            MOI.VectorOfVariables([bridge.xn, y_var]),
+            ComplementsWithSetType{MOI.LessThan{T}}(2),
+        )
+        if bridge.reformulation !== nothing
+            MOI.set(
+                model,
+                ComplementarityReformulation(),
+                bridge.lower,
+                bridge.reformulation,
+            )
+            MOI.set(
+                model,
+                ComplementarityReformulation(),
+                bridge.upper,
+                bridge.reformulation,
+            )
+        end
     end
     return
 end
@@ -293,13 +338,13 @@ function MOI.get(
 end
 
 function MOI.get(
-    ::SplitIntervalBridge{T},
+    bridge::SplitIntervalBridge{T},
     ::MOI.NumberOfConstraints{
         MOI.VectorOfVariables,
         ComplementsWithSetType{MOI.GreaterThan{T}},
     },
 )::Int64 where {T}
-    return 1
+    return bridge.lower === nothing ? 0 : 1
 end
 
 function MOI.get(
@@ -309,17 +354,19 @@ function MOI.get(
         ComplementsWithSetType{MOI.GreaterThan{T}},
     },
 ) where {T}
-    return [bridge.lower]
+    F, S = MOI.VectorOfVariables, ComplementsWithSetType{MOI.GreaterThan{T}}
+    return bridge.lower === nothing ? MOI.ConstraintIndex{F,S}[] :
+           [bridge.lower]
 end
 
 function MOI.get(
-    ::SplitIntervalBridge{T},
+    bridge::SplitIntervalBridge{T},
     ::MOI.NumberOfConstraints{
         MOI.VectorOfVariables,
         ComplementsWithSetType{MOI.LessThan{T}},
     },
 )::Int64 where {T}
-    return 1
+    return bridge.upper === nothing ? 0 : 1
 end
 
 function MOI.get(
@@ -329,7 +376,9 @@ function MOI.get(
         ComplementsWithSetType{MOI.LessThan{T}},
     },
 ) where {T}
-    return [bridge.upper]
+    F, S = MOI.VectorOfVariables, ComplementsWithSetType{MOI.LessThan{T}}
+    return bridge.upper === nothing ? MOI.ConstraintIndex{F,S}[] :
+           [bridge.upper]
 end
 
 function MOI.get(
@@ -363,9 +412,14 @@ function MOI.get(
 end
 
 function MOI.delete(model::MOI.ModelLike, bridge::SplitIntervalBridge)
-    MOI.delete(model, bridge.lower)
-    MOI.delete(model, bridge.upper)
+    if bridge.lower !== nothing
+        MOI.delete(model, bridge.lower)
+    end
+    if bridge.upper !== nothing
+        MOI.delete(model, bridge.upper)
+    end
     MOI.delete(model, bridge.equality)
+    # The bounds `xp_upper`/`xn_lower` are deleted together with `xp`/`xn`.
     MOI.delete(model, bridge.xp)
     MOI.delete(model, bridge.xn)
     return

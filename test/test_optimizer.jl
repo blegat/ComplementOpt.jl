@@ -292,6 +292,49 @@ function test_ComplementarityReformulation_through_SplitInterval()
     return
 end
 
+function test_ComplementarityReformulation_through_SplitInterval_before_final_touch()
+    # Set the per-constraint reformulation *before* `final_touch`, so that
+    # `SplitIntervalBridge` stores it and applies it to `lower`/`upper` when it
+    # creates them in `final_touch`.
+    inner = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
+    B = MathOptComplements.Bridges.NonlinearBridge{Float64}
+    nl_model = MOI.Bridges.Constraint.SingleBridgeOptimizer{B}(inner)
+    B = MathOptComplements.Bridges.SplitIntervalBridge{Float64}
+    model = MOI.Bridges.Constraint.SingleBridgeOptimizer{B}(nl_model)
+    x = MOI.add_variable(model)
+    y, _ = MOI.add_constrained_variable(model, MOI.Interval(0.0, 1.0))
+    ci = MOI.add_constraint(
+        model,
+        MOI.VectorOfVariables([x, y]),
+        MathOptComplements.ComplementsWithSetType{MOI.Interval{Float64}}(2),
+    )
+    attr = MathOptComplements.ComplementarityReformulation()
+    MOI.set(
+        model,
+        attr,
+        ci,
+        MathOptComplements.FischerBurmeisterRelaxation(1e-8),
+    )
+    MOI.Bridges.final_touch(model)
+    MOI.Bridges.final_touch(nl_model)
+    # Fischer-Burmeister → nonlinear constraints (not the default quadratic).
+    @test MOI.get(
+        inner,
+        MOI.NumberOfConstraints{
+            MOI.ScalarNonlinearFunction,
+            MOI.LessThan{Float64},
+        }(),
+    ) > 0
+    @test MOI.get(
+        inner,
+        MOI.NumberOfConstraints{
+            MOI.ScalarQuadraticFunction{Float64},
+            MOI.LessThan{Float64},
+        }(),
+    ) == 0
+    return
+end
+
 function test_ComplementarityReformulation_through_FlipSign()
     inner = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
     B = MathOptComplements.Bridges.FlipSignBridge{Float64}
@@ -401,6 +444,30 @@ function test_bridge_chain()
     # Step 3: LessThan part → FlipSignBridge
     bridge3 = MOI.Bridges.bridge(opt, bridge2.upper)
     @test bridge3 isa MathOptComplements.Bridges.FlipSignBridge
+    return
+end
+
+function test_interval_complements_solve_HiGHS()
+    # End-to-end solve through the SOS1/MILP path (HiGHS has no native SOS1 nor
+    # nonlinear support). The interval bound `0 <= z <= 1e3` makes the second
+    # component be shifted, so `VerticalBridge` introduces a slack that must be
+    # given finite bounds for `SOS1ToMILPBridge` to apply.
+    model = Model(
+        () -> MathOptComplements.Optimizer(
+            MOI.instantiate(HiGHS.Optimizer; with_bridge_type = Float64),
+        ),
+    )
+    set_silent(model)
+    @variable(model, 0 <= z[1:2] <= 1e3)
+    @variable(model, z3)
+    @objective(model, Min, sum(z) - z3)
+    @constraint(model, z3 .<= 4 .* z)
+    @constraint(model, z in MOI.Complements(2))
+    optimize!(model)
+    @test is_solved_and_feasible(model)
+    @test isapprox(objective_value(model), 0.0; atol = 1e-6)
+    @test isapprox(value.(z), [0.0, 0.0]; atol = 1e-6)
+    @test isapprox(value(z3), 0.0; atol = 1e-6)
     return
 end
 

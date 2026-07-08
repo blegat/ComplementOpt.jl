@@ -64,6 +64,28 @@ function MOI.supports_constraint(
     return true
 end
 
+# A MIP solver that additionally supports `SOS1` natively, used to exercise the
+# whole SOS1 reformulation chain end-to-end via `copy_to`.
+MOI.Utilities.@model(
+    SOS1MIPModel,
+    (MOI.ZeroOne, MOI.Integer),
+    (MOI.EqualTo, MOI.GreaterThan, MOI.LessThan, MOI.Interval),
+    (MOI.Nonnegatives, MOI.Nonpositives, MOI.Zeros),
+    (MOI.SOS1,),
+    (),
+    (MOI.ScalarAffineFunction,),
+    (MOI.VectorOfVariables,),
+    (MOI.VectorAffineFunction,),
+)
+
+function MOI.supports_constraint(
+    ::SOS1MIPModel,
+    ::Type{MOI.ScalarNonlinearFunction},
+    ::Type{<:MOI.AbstractScalarSet},
+)
+    return false
+end
+
 function runtests()
     is_test(name) = startswith("$name", "test_")
     @testset "$name" for name in filter(is_test, names(@__MODULE__; all = true))
@@ -110,6 +132,28 @@ function test_mip_does_not_select_nonlinear_bridge()
         MOI.VectorOfVariables,
         MOC.ComplementsWithSetType{MOI.Zeros},
     ) <: MOC.Bridges.ToZerosBridge
+    return
+end
+
+function test_copy_interval_complements_uses_sos1_path()
+    # `z[2] in [0, 1]` makes `ComplementsVectorizeBridge` shift the second
+    # component by a nonzero bound, producing an affine right-hand side that
+    # `VerticalBridge` must handle by introducing a slack. Copying the model
+    # exercises the whole `SpecifySetType → SplitInterval → Vectorize → FlipSign
+    # → Vertical → ToSOS1` chain.
+    src = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
+    z = MOI.add_variables(src, 2)
+    for zi in z
+        MOI.add_constraint(src, zi, MOI.Interval(0.0, 1.0))
+    end
+    MOI.add_constraint(src, MOI.VectorOfVariables(z), MOI.Complements(2))
+    dest = _lazy(SOS1MIPModel{Float64}())
+    MOI.copy_to(dest, src)
+    inner = dest.model
+    @test MOI.get(
+        inner,
+        MOI.NumberOfConstraints{MOI.VectorOfVariables,MOI.SOS1{Float64}}(),
+    ) >= 1
     return
 end
 
