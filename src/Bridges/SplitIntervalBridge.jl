@@ -204,7 +204,8 @@ function MOI.Bridges.final_touch(
     # Bound `xp` and `xn` from the activity bounds. This is done before creating
     # `lower`/`upper` below so that the bridges they trigger (e.g.
     # `VerticalBridge`) can compute the bounds of the slacks they introduce.
-    ret = _activity_bounds(model, T, first(MOI.Utilities.eachscalar(bridge.func)))
+    ret =
+        _activity_bounds(model, T, first(MOI.Utilities.eachscalar(bridge.func)))
     if ret === nothing
         if bridge.xp_upper !== nothing
             MOI.delete(model, bridge.xp_upper)

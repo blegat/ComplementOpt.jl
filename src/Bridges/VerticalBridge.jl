@@ -221,7 +221,6 @@ function MOI.Bridges.final_touch(
     return
 end
 
-
 function MOI.supports(
     ::MOI.ModelLike,
     ::ComplementarityReformulation,
@@ -382,8 +381,7 @@ function reformulate_to_vertical!(
 ) where {T}
     equalities = MOI.ConstraintIndex[]
     slacks = MOI.VariableIndex[]
-    slacks_to_bound =
-        Tuple{MOI.VariableIndex,MOI.AbstractScalarFunction}[]
+    slacks_to_bound = Tuple{MOI.VariableIndex,MOI.AbstractScalarFunction}[]
     add_bounds = !(set isa MOI.Complements)
     ind_cc1, ind_cc2 = MOI.VariableIndex[], MOI.VariableIndex[]
     n_comp = div(set.dimension, 2)
