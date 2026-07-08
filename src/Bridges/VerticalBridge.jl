@@ -287,13 +287,11 @@ end
 function _expr_bounds(
     model,
     ::Type{T},
-    expr::Union{MOI.VariableIndex,MOI.ScalarAffineFunction{T}},
+    expr::MOI.AbstractScalarFunction,
 ) where {T}
     cache = Dict{MOI.VariableIndex,NTuple{2,T}}()
     return MOI.Utilities.get_bounds(model, cache, expr)
 end
-
-_expr_bounds(model, ::Type{T}, ::MOI.AbstractScalarFunction) where {T} = nothing
 
 # Return a single variable representing `expr`. If `expr` is already a single
 # variable, it is returned directly. Otherwise, a slack variable `s` is created
