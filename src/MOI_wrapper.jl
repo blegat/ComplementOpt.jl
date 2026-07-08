@@ -24,7 +24,6 @@ end
 
 Optimizer(model::MOI.ModelLike) = Optimizer{Float64}(model)
 
-MOI.Bridges.supports_constraint_bridges(::Optimizer) = true
 MOI.Bridges.Constraint.bridges(model::Optimizer) = model.constraint_map
 
 """
