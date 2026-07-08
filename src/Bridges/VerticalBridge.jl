@@ -197,6 +197,30 @@ function MOI.delete(model::MOI.ModelLike, bridge::VerticalBridge)
     return
 end
 
+MOI.Bridges.needs_final_touch(::VerticalBridge) = true
+
+function MOI.Bridges.final_touch(
+    bridge::VerticalBridge{T},
+    model::MOI.ModelLike,
+) where {T}
+    # Propagate the bounds of each slack's expression to the slack variable so
+    # that bridges requiring a finite domain (e.g. `SOS1ToMILPBridge`) can be
+    # applied.
+    for (s, expr) in bridge.slacks_to_bound
+        if any(ci -> ci.value == s.value, bridge.bounds)
+            continue  # The slack is already bounded.
+        end
+        b = _expr_bounds(model, T, expr)
+        if b !== nothing
+            push!(
+                bridge.bounds,
+                MOI.add_constraint(model, s, MOI.Interval(b[1], b[2])),
+            )
+        end
+    end
+    return
+end
+
 
 function MOI.supports(
     ::MOI.ModelLike,
