@@ -292,6 +292,44 @@ function test_ComplementarityReformulation_through_SplitInterval()
     return
 end
 
+function test_ComplementarityReformulation_through_SplitInterval_before_final_touch()
+    # Set the per-constraint reformulation *before* `final_touch`, so that
+    # `SplitIntervalBridge` stores it and applies it to `lower`/`upper` when it
+    # creates them in `final_touch`.
+    inner = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
+    B = MathOptComplements.Bridges.NonlinearBridge{Float64}
+    nl_model = MOI.Bridges.Constraint.SingleBridgeOptimizer{B}(inner)
+    B = MathOptComplements.Bridges.SplitIntervalBridge{Float64}
+    model = MOI.Bridges.Constraint.SingleBridgeOptimizer{B}(nl_model)
+    x = MOI.add_variable(model)
+    y, _ = MOI.add_constrained_variable(model, MOI.Interval(0.0, 1.0))
+    ci = MOI.add_constraint(
+        model,
+        MOI.VectorOfVariables([x, y]),
+        MathOptComplements.ComplementsWithSetType{MOI.Interval{Float64}}(2),
+    )
+    attr = MathOptComplements.ComplementarityReformulation()
+    MOI.set(model, attr, ci, MathOptComplements.FischerBurmeisterRelaxation(1e-8))
+    MOI.Bridges.final_touch(model)
+    MOI.Bridges.final_touch(nl_model)
+    # Fischer-Burmeister → nonlinear constraints (not the default quadratic).
+    @test MOI.get(
+        inner,
+        MOI.NumberOfConstraints{
+            MOI.ScalarNonlinearFunction,
+            MOI.LessThan{Float64},
+        }(),
+    ) > 0
+    @test MOI.get(
+        inner,
+        MOI.NumberOfConstraints{
+            MOI.ScalarQuadraticFunction{Float64},
+            MOI.LessThan{Float64},
+        }(),
+    ) == 0
+    return
+end
+
 function test_ComplementarityReformulation_through_FlipSign()
     inner = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
     B = MathOptComplements.Bridges.FlipSignBridge{Float64}
