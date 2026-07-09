@@ -14,3 +14,4 @@ MathOptComplementsJuMPExt = "JuMP"
 [compat]
 JuMP = "1"
 MathOptInterface = "1.51"
+julia = "1.10"
