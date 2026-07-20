@@ -31,52 +31,51 @@ to an equality constraint instead.
   * [`MOI.ScalarAffineFunction{T}`](@ref) in [`MOI.EqualTo{T}`](@ref)
 
 """
-struct VerticalBridge{T,S<:MOI.AbstractVectorSet} <:
-       MOI.Bridges.Constraint.AbstractBridge
-    constraint::MOI.ConstraintIndex{MOI.VectorOfVariables,S}
+mutable struct VerticalBridge{T,S<:MOI.AbstractVectorSet} <:
+               MOI.Bridges.Constraint.AbstractBridge
+    # The reformulation is done in `final_touch` (once the bounds of the second
+    # component are set), so `constraint` is `nothing` until then and `func`/`set`
+    # store the original constraint.
+    constraint::Union{Nothing,MOI.ConstraintIndex{MOI.VectorOfVariables,S}}
     equalities::Vector{MOI.ConstraintIndex}
     slacks::Vector{MOI.VariableIndex}
-    # Slacks that should be bounded in `final_touch`, together with the
-    # expression they are equal to, so that their bounds can be computed once the
-    # bounds of the underlying variables are set.
-    slacks_to_bound::Vector{Tuple{MOI.VariableIndex,MOI.AbstractScalarFunction}}
     bounds::Vector{MOI.ConstraintIndex{MOI.VariableIndex,MOI.Interval{T}}}
+    func::MOI.AbstractVectorFunction
+    set::S
+    reformulation::Union{Nothing,AbstractComplementarityRelaxation}
+end
+
+function VerticalBridge{T,S}(
+    func::MOI.AbstractVectorFunction,
+    set::S,
+) where {T,S<:MOI.AbstractVectorSet}
+    return VerticalBridge{T,S}(
+        nothing,
+        MOI.ConstraintIndex[],
+        MOI.VariableIndex[],
+        MOI.ConstraintIndex{MOI.VariableIndex,MOI.Interval{T}}[],
+        func,
+        set,
+        nothing,
+    )
 end
 
 function MOI.Bridges.Constraint.bridge_constraint(
     ::Type{VerticalBridge{T,MOI.Complements}},
-    model::MOI.ModelLike,
+    ::MOI.ModelLike,
     func::MOI.AbstractVectorFunction,
     set::MOI.Complements,
 ) where {T}
-    ci, equalities, slacks, slacks_to_bound =
-        reformulate_to_vertical!(model, T, func, set)
-    bounds = MOI.ConstraintIndex{MOI.VariableIndex,MOI.Interval{T}}[]
-    return VerticalBridge{T,MOI.Complements}(
-        ci,
-        equalities,
-        slacks,
-        slacks_to_bound,
-        bounds,
-    )
+    return VerticalBridge{T,MOI.Complements}(func, set)
 end
 
 function MOI.Bridges.Constraint.bridge_constraint(
     ::Type{VerticalBridge{T,ComplementsWithSetType{S}}},
-    model::MOI.ModelLike,
+    ::MOI.ModelLike,
     func::MOI.AbstractVectorFunction,
     set::ComplementsWithSetType{S},
 ) where {T,S}
-    ci, equalities, slacks, slacks_to_bound =
-        reformulate_to_vertical!(model, T, func, set)
-    bounds = MOI.ConstraintIndex{MOI.VariableIndex,MOI.Interval{T}}[]
-    return VerticalBridge{T,ComplementsWithSetType{S}}(
-        ci,
-        equalities,
-        slacks,
-        slacks_to_bound,
-        bounds,
-    )
+    return VerticalBridge{T,ComplementsWithSetType{S}}(func, set)
 end
 
 function MOI.supports_constraint(
@@ -136,17 +135,30 @@ function MOI.get(bridge::VerticalBridge, ::MOI.ListOfVariableIndices)
 end
 
 function MOI.get(
-    ::VerticalBridge{T,S},
+    bridge::VerticalBridge{T,S},
     ::MOI.NumberOfConstraints{MOI.VectorOfVariables,S},
 )::Int64 where {T,S}
-    return 1
+    return bridge.constraint === nothing ? 0 : 1
 end
 
 function MOI.get(
     bridge::VerticalBridge{T,S},
     ::MOI.ListOfConstraintIndices{MOI.VectorOfVariables,S},
 ) where {T,S}
-    return [bridge.constraint]
+    CI = MOI.ConstraintIndex{MOI.VectorOfVariables,S}
+    return bridge.constraint === nothing ? CI[] : CI[bridge.constraint]
+end
+
+function MOI.get(
+    ::MOI.ModelLike,
+    ::MOI.ConstraintFunction,
+    bridge::VerticalBridge,
+)
+    return bridge.func
+end
+
+function MOI.get(::MOI.ModelLike, ::MOI.ConstraintSet, bridge::VerticalBridge)
+    return bridge.set
 end
 
 function MOI.get(
@@ -186,7 +198,9 @@ function MOI.get(
 end
 
 function MOI.delete(model::MOI.ModelLike, bridge::VerticalBridge)
-    MOI.delete(model, bridge.constraint)
+    if bridge.constraint !== nothing
+        MOI.delete(model, bridge.constraint)
+    end
     for ci in bridge.equalities
         MOI.delete(model, ci)
     end
@@ -203,13 +217,21 @@ function MOI.Bridges.final_touch(
     bridge::VerticalBridge{T},
     model::MOI.ModelLike,
 ) where {T}
-    # Propagate the bounds of each slack's expression to the slack variable so
-    # that bridges requiring a finite domain (e.g. `SOS1ToMILPBridge`) can be
-    # applied.
-    for (s, expr) in bridge.slacks_to_bound
-        if any(ci -> ci.value == s.value, bridge.bounds)
-            continue  # The slack is already bounded.
-        end
+    if bridge.constraint !== nothing
+        return
+    end
+    # Reformulate in `final_touch` so that the bounds needed to decide whether an
+    # unbounded second component turns the constraint into an equality, and to
+    # bound the slacks, are available (`SpecifySetTypeBridge` and
+    # `SplitIntervalBridge`, which set those bounds, run first).
+    ci, equalities, slacks, slacks_to_bound =
+        reformulate_to_vertical!(model, T, bridge.func, bridge.set)
+    bridge.constraint = ci
+    append!(bridge.equalities, equalities)
+    append!(bridge.slacks, slacks)
+    # Bound each slack from the bounds of the expression it is equal to, so that
+    # bridges requiring a finite domain (e.g. `SOS1ToMILPBridge`) can be applied.
+    for (s, expr) in slacks_to_bound
         b = _expr_bounds(model, T, expr)
         if b !== nothing
             push!(
@@ -217,6 +239,14 @@ function MOI.Bridges.final_touch(
                 MOI.add_constraint(model, s, MOI.Interval(b[1], b[2])),
             )
         end
+    end
+    if bridge.reformulation !== nothing
+        MOI.set(
+            model,
+            ComplementarityReformulation(),
+            bridge.constraint,
+            bridge.reformulation,
+        )
     end
     return
 end
@@ -235,7 +265,10 @@ function MOI.set(
     bridge::VerticalBridge,
     value::AbstractComplementarityRelaxation,
 )
-    MOI.set(model, attr, bridge.constraint, value)
+    bridge.reformulation = value
+    if bridge.constraint !== nothing
+        MOI.set(model, attr, bridge.constraint, value)
+    end
     return
 end
 
