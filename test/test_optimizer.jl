@@ -376,6 +376,9 @@ function test_ComplementarityReformulation_through_ComplementsVectorize()
     attr = MathOptComplements.ComplementarityReformulation()
     relax = MathOptComplements.FischerBurmeisterRelaxation(1e-8)
     MOI.set(model, attr, ci, relax)
+    # `ComplementsVectorizeBridge` creates its (shifted) constraint in
+    # `final_touch`, applying the reformulation set above.
+    MOI.Bridges.final_touch(model)
     # ComplementsVectorize shifts GreaterThan → Nonnegatives, check child exists
     S = MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}
     @test MOI.get(

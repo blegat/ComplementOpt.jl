@@ -34,10 +34,14 @@ where `T` is the coefficient type.
     [`MOI.Zeros`](@ref) depending on the input set type
 
 """
-struct ComplementsVectorizeBridge{T,F,S,SV} <:
-       MOI.Bridges.Constraint.AbstractBridge
-    constraint::MOI.ConstraintIndex{F,ComplementsWithSetType{SV}}
-    set_constant::T
+mutable struct ComplementsVectorizeBridge{T,F,S,SV} <:
+               MOI.Bridges.Constraint.AbstractBridge
+    # The shifted constraint is created in `final_touch` (once the bounds of `x2`
+    # are set) so it is `nothing` until then.
+    constraint::Union{Nothing,MOI.ConstraintIndex{F,ComplementsWithSetType{SV}}}
+    func::MOI.VectorOfVariables
+    set::ComplementsWithSetType{S}
+    reformulation::Union{Nothing,AbstractComplementarityRelaxation}
 end
 
 _vector_set_type(::Type{<:MOI.GreaterThan}) = MOI.Nonnegatives
@@ -80,13 +84,35 @@ function MOI.Bridges.Constraint.bridge_constraint(
     set::ComplementsWithSetType{S},
 ) where {T,F,S,SV}
     @assert set.dimension == 2
-    x1 = func.variables[1]
-    x2 = func.variables[2]
-    c = _set_constant(T, model, set, x2)
+    # The shift depends on the bounds of `x2`, so it is done in `final_touch`.
+    return ComplementsVectorizeBridge{T,F,S,SV}(nothing, func, set, nothing)
+end
+
+MOI.Bridges.needs_final_touch(::ComplementsVectorizeBridge) = true
+
+function MOI.Bridges.final_touch(
+    bridge::ComplementsVectorizeBridge{T,F,S,SV},
+    model::MOI.ModelLike,
+) where {T,F,S,SV}
+    if bridge.constraint !== nothing
+        return
+    end
+    x1 = bridge.func.variables[1]
+    x2 = bridge.func.variables[2]
+    c = _set_constant(T, model, bridge.set, x2)
     # Shift only x2: [x1, x2] → [x1, x2 - c]
     shifted = MOI.Utilities.operate(vcat, T, one(T) * x1, one(T) * x2 - c)
-    ci = MOI.add_constraint(model, shifted, ComplementsWithSetType{SV}(2))
-    return ComplementsVectorizeBridge{T,F,S,SV}(ci, c)
+    bridge.constraint =
+        MOI.add_constraint(model, shifted, ComplementsWithSetType{SV}(2))
+    if bridge.reformulation !== nothing
+        MOI.set(
+            model,
+            ComplementarityReformulation(),
+            bridge.constraint,
+            bridge.reformulation,
+        )
+    end
+    return
 end
 
 function MOI.supports_constraint(
@@ -122,7 +148,10 @@ function MOI.set(
     bridge::ComplementsVectorizeBridge,
     value::AbstractComplementarityRelaxation,
 )
-    MOI.set(model, attr, bridge.constraint, value)
+    bridge.reformulation = value
+    if bridge.constraint !== nothing
+        MOI.set(model, attr, bridge.constraint, value)
+    end
     return
 end
 
@@ -141,39 +170,39 @@ function MOI.Bridges.added_constraint_types(
 end
 
 function MOI.get(
-    ::ComplementsVectorizeBridge{T,F,S,SV},
+    bridge::ComplementsVectorizeBridge{T,F,S,SV},
     ::MOI.NumberOfConstraints{F,ComplementsWithSetType{SV}},
 )::Int64 where {T,F,S,SV}
-    return 1
+    return bridge.constraint === nothing ? 0 : 1
 end
 
 function MOI.get(
     bridge::ComplementsVectorizeBridge{T,F,S,SV},
     ::MOI.ListOfConstraintIndices{F,ComplementsWithSetType{SV}},
 ) where {T,F,S,SV}
-    return [bridge.constraint]
+    CI = MOI.ConstraintIndex{F,ComplementsWithSetType{SV}}
+    return bridge.constraint === nothing ? CI[] : CI[bridge.constraint]
 end
 
 function MOI.get(
-    model::MOI.ModelLike,
+    ::MOI.ModelLike,
     ::MOI.ConstraintFunction,
     bridge::ComplementsVectorizeBridge,
 )
-    f = MOI.get(model, MOI.ConstraintFunction(), bridge.constraint)
-    terms = f.terms
-    vars = [t.scalar_term.variable for t in terms]
-    return MOI.VectorOfVariables(vars)
+    return bridge.func
 end
 
 function MOI.get(
     ::MOI.ModelLike,
     ::MOI.ConstraintSet,
-    ::ComplementsVectorizeBridge{T,F,S},
-) where {T,F,S}
-    return ComplementsWithSetType{S}(2)
+    bridge::ComplementsVectorizeBridge,
+)
+    return bridge.set
 end
 
 function MOI.delete(model::MOI.ModelLike, bridge::ComplementsVectorizeBridge)
-    MOI.delete(model, bridge.constraint)
+    if bridge.constraint !== nothing
+        MOI.delete(model, bridge.constraint)
+    end
     return
 end
