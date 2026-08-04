@@ -263,7 +263,12 @@ end
 # implementation of `add_bridged_constraint` so that I don't have to reimplement
 # it
 function MOI.Bridges.add_bridged_constraint(b::Optimizer, BridgeType, f, s)
-    bridge = MOI.Bridges.Constraint.Constraint.bridge_constraint(
+    map = MOI.Bridges.Constraint.bridges(b)::MOI.Bridges.Constraint.Map
+    # `bridge_constraint` may add bridges that also need `final_touch` and, as
+    # explained in the default implementation, `bridge` must come *before* them
+    # in `needs_final_touch`, hence the `insert!` at the remembered position.
+    n_final_touch = length(map.needs_final_touch)
+    bridge = MOI.Bridges.Constraint.bridge_constraint(
         BridgeType,
         MOI.Bridges.recursive_model(b),
         f,
@@ -272,8 +277,11 @@ function MOI.Bridges.add_bridged_constraint(b::Optimizer, BridgeType, f, s)
     )
     # The rest is copy-pasted from the default implementation of
     # `add_bridged_constraint` in MOI
+    if MOI.Bridges.needs_final_touch(bridge)
+        insert!(map.needs_final_touch, n_final_touch + 1, bridge)
+    end
     ci = MOI.Bridges.Constraint.add_key_for_bridge(
-        MOI.Bridges.Constraint.bridges(b)::MOI.Bridges.Constraint.Map,
+        map,
         bridge,
         f,
         s,
