@@ -70,6 +70,18 @@ function MOI.Bridges.supports_bridging_constrained_variable(
     return true
 end
 
+# The variables are not bridged (`is_variable_bridged` is `false`), so
+# `add_constrained_variables` falls back to adding the variables and then the
+# `MOI.VectorOfVariables` constraint. This is only needed for
+# `MOI.VariableBridgingCost`, which `MOI.Utilities.copy_to` queries to decide in
+# which order the variables are added.
+function MOI.Bridges.bridge_type(
+    b::Optimizer,
+    S::Type{<:ComplementsWithSetType},
+)
+    return MOI.Bridges.bridge_type(b, MOI.VectorOfVariables, S)
+end
+
 # No objective bridge
 MOI.Bridges.is_bridged(::Optimizer, ::Type{<:MOI.AbstractFunction}) = false
 
