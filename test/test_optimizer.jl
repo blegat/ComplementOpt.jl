@@ -376,6 +376,9 @@ function test_ComplementarityReformulation_through_ComplementsVectorize()
     attr = MathOptComplements.ComplementarityReformulation()
     relax = MathOptComplements.FischerBurmeisterRelaxation(1e-8)
     MOI.set(model, attr, ci, relax)
+    # `ComplementsVectorizeBridge` creates its (shifted) constraint in
+    # `final_touch`, applying the reformulation set above.
+    MOI.Bridges.final_touch(model)
     # ComplementsVectorize shifts GreaterThan → Nonnegatives, check child exists
     S = MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}
     @test MOI.get(
@@ -386,6 +389,54 @@ function test_ComplementarityReformulation_through_ComplementsVectorize()
     b = MOI.Bridges.bridge(model, ci)
     @test MOI.get(inner, attr, b.constraint) isa
           MathOptComplements.FischerBurmeisterRelaxation
+    return
+end
+
+function test_ComplementarityReformulation_through_ComplementsVectorize_after_final_touch()
+    # Same as above but the reformulation is set *after* `final_touch`, so the
+    # bridge forwards it to the constraint it already created.
+    inner = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
+    B = MathOptComplements.Bridges.ComplementsVectorizeBridge{Float64}
+    model = MOI.Bridges.Constraint.SingleBridgeOptimizer{B}(inner)
+    x, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
+    y, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(3.0))
+    ci = MOI.add_constraint(
+        model,
+        MOI.VectorOfVariables([x, y]),
+        MathOptComplements.ComplementsWithSetType{MOI.GreaterThan{Float64}}(2),
+    )
+    MOI.Bridges.final_touch(model)
+    b = MOI.Bridges.bridge(model, ci)
+    @test b.constraint !== nothing
+    attr = MathOptComplements.ComplementarityReformulation()
+    relax = MathOptComplements.FischerBurmeisterRelaxation(1e-8)
+    MOI.set(model, attr, ci, relax)
+    @test MOI.get(inner, attr, b.constraint) == relax
+    return
+end
+
+function test_ComplementarityReformulation_through_Vertical_after_final_touch()
+    # The left-hand side is an expression, so the constraint goes through
+    # `VerticalBridge`, which creates its constraint in `final_touch`. Setting
+    # the reformulation afterwards must forward it to that constraint.
+    inner = MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}())
+    B = MathOptComplements.Bridges.VerticalBridge{Float64}
+    model = MOI.Bridges.Constraint.SingleBridgeOptimizer{B}(inner)
+    x = MOI.add_variable(model)
+    y, _ = MOI.add_constrained_variable(model, MOI.GreaterThan(0.0))
+    S = MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}
+    ci = MOI.add_constraint(
+        model,
+        MOI.Utilities.operate(vcat, Float64, 2.0 * x + 3.0, 1.0 * y),
+        S(2),
+    )
+    MOI.Bridges.final_touch(model)
+    b = MOI.Bridges.bridge(model, ci)
+    @test b.constraint !== nothing
+    attr = MathOptComplements.ComplementarityReformulation()
+    relax = MathOptComplements.FischerBurmeisterRelaxation(1e-8)
+    MOI.set(model, attr, ci, relax)
+    @test MOI.get(inner, attr, b.constraint) == relax
     return
 end
 
