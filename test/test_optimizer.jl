@@ -522,6 +522,64 @@ function test_interval_complements_solve_HiGHS()
     return
 end
 
+function test_ComplementsWithSetType_added_directly_HiGHS()
+    # The user gives the set type directly instead of going through
+    # `MOI.Complements`/`SpecifySetTypeBridge`. Because the shift by the lower
+    # bound of `x2` is now computed in `final_touch`, the constraint can even be
+    # added *before* that bound is set.
+    model = Model(
+        () -> MathOptComplements.Optimizer(
+            MOI.instantiate(HiGHS.Optimizer; with_bridge_type = Float64),
+        ),
+    )
+    set_silent(model)
+    @variable(model, x1)
+    @variable(model, x2)
+    S = MathOptComplements.ComplementsWithSetType{MOI.GreaterThan{Float64}}
+    @constraint(model, [x1, x2] in S(2))
+    # Finite bounds are needed by `SOS1ToMILPBridge` (HiGHS has neither native
+    # SOS1 nor nonlinear support).
+    set_lower_bound(x1, 0.0)
+    set_upper_bound(x1, 1e3)
+    set_lower_bound(x2, 1.0)
+    set_upper_bound(x2, 1e3)
+    @constraint(model, x1 + x2 >= 2)
+    @objective(model, Min, x1 + 3 * x2)
+    optimize!(model)
+    @test is_solved_and_feasible(model)
+    # The complementarity is `x1 ⟂ (x2 - 1)`, so either `x2 = 1` and `x1 >= 1`
+    # (objective `4`), or `x1 = 0` and `x2 >= 2` (objective `6`).
+    @test isapprox(objective_value(model), 4.0; atol = 1e-6)
+    @test isapprox(value(x1), 1.0; atol = 1e-6)
+    @test isapprox(value(x2), 1.0; atol = 1e-6)
+    return
+end
+
+function test_ComplementsWithSetType_added_directly_Ipopt()
+    # Same model as above but the inner solver supports nonlinear constraints,
+    # so `NonlinearBridge` reformulates the complementarity instead.
+    model = Model(
+        () -> MathOptComplements.Optimizer(
+            MOI.instantiate(Ipopt.Optimizer; with_cache_type = Float64),
+        ),
+    )
+    set_silent(model)
+    @variable(model, x1)
+    @variable(model, x2)
+    S = MathOptComplements.ComplementsWithSetType{MOI.GreaterThan{Float64}}
+    @constraint(model, [x1, x2] in S(2))
+    set_lower_bound(x1, 0.0)
+    set_lower_bound(x2, 1.0)
+    @constraint(model, x1 + x2 >= 2)
+    @objective(model, Min, x1 + 3 * x2)
+    optimize!(model)
+    @test is_solved_and_feasible(model)
+    @test isapprox(objective_value(model), 4.0; atol = 1e-6)
+    @test isapprox(value(x1), 1.0; atol = 1e-6)
+    @test isapprox(value(x2), 1.0; atol = 1e-6)
+    return
+end
+
 function test_add_all_bridges_JuMP_GenericModel()
     model = Model(Ipopt.Optimizer)
     MathOptComplements.Bridges.add_all_bridges(model)
