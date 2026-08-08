@@ -35,7 +35,8 @@ function test_per_constraint_reformulation()
     set_optimizer(
         model,
         () -> MathOptComplements.Optimizer(
-            MOI.instantiate(Ipopt.Optimizer; with_cache_type = Float64),
+            Ipopt.Optimizer;
+            with_cache_type = Float64,
         );
         with_cache_type = Float64,
     )
@@ -46,10 +47,9 @@ function test_per_constraint_reformulation()
         MathOptComplements.ScholtesRelaxation(0.0),
     )
     # Override c1 with FischerBurmeister
-    MOI.set(
-        model,
-        MathOptComplements.ComplementarityReformulation(),
+    set_attribute(
         c1,
+        MathOptComplements.ComplementarityReformulation(),
         MathOptComplements.FischerBurmeisterRelaxation(1e-8),
     )
     @test MOI.supports(
@@ -82,10 +82,9 @@ function test_per_constraint_reformulation()
         MathOptComplements.ComplementarityReformulation(),
         MOI.ConstraintIndex{MOI.VectorOfVariables,MOI.Complements},
     )
-    @test MOI.get(
-        model,
-        MathOptComplements.ComplementarityReformulation(),
+    @test get_attribute(
         c1,
+        MathOptComplements.ComplementarityReformulation(),
     ) isa MathOptComplements.FischerBurmeisterRelaxation
     set_attribute(model, "bound_relax_factor", 0.0)
     set_silent(model)
@@ -125,7 +124,8 @@ function test_per_constraint_reformulation_after_optimize!()
     set_optimizer(
         model,
         () -> MathOptComplements.Optimizer(
-            MOI.instantiate(Ipopt.Optimizer; with_cache_type = Float64),
+            Ipopt.Optimizer;
+            with_cache_type = Float64,
         );
         with_cache_type = Float64,
     )
@@ -139,7 +139,7 @@ function test_per_constraint_reformulation_after_optimize!()
     optimize!(model)
     @test is_solved_and_feasible(model)
     # Scholtes produces a quadratic constraint
-    inner = backend(model).optimizer.model.optimizer.model
+    inner = unsafe_backend(unsafe_backend(model).model)
     @test MOI.get(
         inner,
         MOI.NumberOfConstraints{
@@ -148,20 +148,18 @@ function test_per_constraint_reformulation_after_optimize!()
         }(),
     ) == 1
     # Change reformulation after first optimize! (bridge.constraints is populated)
-    MOI.set(
-        model,
-        MathOptComplements.ComplementarityReformulation(),
+    set_attribute(
         c,
+        MathOptComplements.ComplementarityReformulation(),
         MathOptComplements.FischerBurmeisterRelaxation(1e-8),
     )
-    @test MOI.get(
-        model,
-        MathOptComplements.ComplementarityReformulation(),
+    @test get_attribute(
         c,
+        MathOptComplements.ComplementarityReformulation(),
     ) isa MathOptComplements.FischerBurmeisterRelaxation
     optimize!(model)
     @test is_solved_and_feasible(model)
-    inner = backend(model).optimizer.model.optimizer.model
+    inner = unsafe_backend(unsafe_backend(model).model)
     # FB produces a nonlinear constraint
     @test MOI.get(
         inner,
@@ -182,7 +180,8 @@ end
 function test_Optimizer_bridge_dispatch()
     # NLP path: VectorAffineFunction in ComplementsWithSetType → NonlinearBridge
     opt_nlp = MathOptComplements.Optimizer(
-        MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}()),
+        () ->
+            MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}()),
     )
     S = MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}
     @test MOI.Bridges.is_bridged(opt_nlp, S)
@@ -201,7 +200,8 @@ function test_Optimizer_bridge_dispatch()
     # ToZerosBridge (the activity is complementary to a fixed/free variable, so
     # it is forced to zero).
     opt_sos1 = MathOptComplements.Optimizer(
-        MOI.Bridges.full_bridge_optimizer(HiGHS.Optimizer(), Float64),
+        HiGHS.Optimizer;
+        with_bridge_type = Float64,
     )
     S_zeros = MathOptComplements.ComplementsWithSetType{MOI.Zeros}
     @test MOI.Bridges.bridge_type(opt_sos1, MOI.VectorOfVariables, S_zeros) ==
@@ -450,17 +450,19 @@ function test_per_constraint_reformulation_with_VerticalBridge()
     set_optimizer(
         model,
         () -> MathOptComplements.Optimizer(
-            MOI.instantiate(Ipopt.Optimizer; with_cache_type = Float64),
-        ),
+            Ipopt.Optimizer;
+            with_cache_type = Float64,
+        );
+        with_cache_type = Float64,
     )
     attr = MathOptComplements.ComplementarityReformulation()
     reformulation = MathOptComplements.FischerBurmeisterRelaxation(1e-8)
-    MOI.set(model, attr, c, reformulation)
+    set_attribute(c, attr, reformulation)
     set_attribute(model, "bound_relax_factor", 0.0)
     set_silent(model)
     optimize!(model)
     @test MOI.supports(backend(model), attr, typeof(index(c)))
-    @test MOI.get(model, attr, c) == reformulation
+    @test get_attribute(c, attr) == reformulation
     @test is_solved_and_feasible(model)
     return
 end
@@ -470,7 +472,8 @@ function test_bridge_chain()
     # HiGHS does not support ScalarNonlinearFunction, so the Optimizer
     # uses the SOS1 path instead of NonlinearBridge.
     opt = MathOptComplements.Optimizer(
-        MOI.Bridges.full_bridge_optimizer(HiGHS.Optimizer(), Float64),
+        HiGHS.Optimizer;
+        with_bridge_type = Float64,
     )
     # Create a model with an Interval complementarity constraint
     x = MOI.add_variable(opt)
@@ -602,7 +605,7 @@ end
 function test_opt_add_all_bridges()
     is_test(f) = startswith("$f", "_test_opt_")
     function make_opt(inner)
-        lazy = MOI.Bridges.full_bridge_optimizer(inner, Float64)
+        lazy = MOI.instantiate(inner; with_bridge_type = Float64)
         MathOptComplements.Bridges.add_all_bridges(lazy)
         return lazy
     end
@@ -617,9 +620,9 @@ function _test_opt_lower_bound_nonnegatives(make_opt)
     @variable(model, x)
     @variable(model, 0.0 <= y)
     @constraint(model, [x, y] ∈ MOI.Complements(2))
-    inner = MOI.Utilities.Model{Float64}()
-    set_optimizer(model, () -> make_opt(inner))
+    set_optimizer(model, () -> make_opt(MOI.Utilities.Model{Float64}))
     MOI.Utilities.attach_optimizer(model)
+    inner = unsafe_backend(model)
     # ComplementsWithSetType is bridged further to nonlinear constraints
     S = MathOptComplements.ComplementsWithSetType{MOI.Nonnegatives}
     @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) ==
@@ -632,9 +635,9 @@ function _test_opt_lower_bound_greater_than(make_opt)
     @variable(model, x)
     @variable(model, 3.0 <= y)
     @constraint(model, [x, y] ∈ MOI.Complements(2))
-    inner = MOI.Utilities.Model{Float64}()
-    set_optimizer(model, () -> make_opt(inner))
+    set_optimizer(model, () -> make_opt(MOI.Utilities.Model{Float64}))
     MOI.Utilities.attach_optimizer(model)
+    inner = unsafe_backend(model)
     S = MathOptComplements.ComplementsWithSetType{MOI.GreaterThan{Float64}}
     @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) ==
           0
@@ -646,9 +649,9 @@ function _test_opt_upper_bound_less_than(make_opt)
     @variable(model, x)
     @variable(model, y <= 1.0)
     @constraint(model, [x, y] ∈ MOI.Complements(2))
-    inner = MOI.Utilities.Model{Float64}()
-    set_optimizer(model, () -> make_opt(inner))
+    set_optimizer(model, () -> make_opt(MOI.Utilities.Model{Float64}))
     MOI.Utilities.attach_optimizer(model)
+    inner = unsafe_backend(model)
     S = MathOptComplements.ComplementsWithSetType{MOI.LessThan{Float64}}
     @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) ==
           0
@@ -660,9 +663,9 @@ function _test_opt_range_case_x1_bounded_interval(make_opt)
     @variable(model, x)
     @variable(model, 0.0 <= y <= 1.0)
     @constraint(model, [x, y] ∈ MOI.Complements(2))
-    inner = MOI.Utilities.Model{Float64}()
-    set_optimizer(model, () -> make_opt(inner))
+    set_optimizer(model, () -> make_opt(MOI.Utilities.Model{Float64}))
     MOI.Utilities.attach_optimizer(model)
+    inner = unsafe_backend(model)
     S = MathOptComplements.ComplementsWithSetType{MOI.Interval{Float64}}
     @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) ==
           0
@@ -674,9 +677,9 @@ function _test_opt_range_case_x1_bounded_nonneg(make_opt)
     @variable(model, 0.0 <= x <= 10.0)
     @variable(model, 0.0 <= y <= 10.0)
     @constraint(model, [x, y] ∈ MOI.Complements(2))
-    inner = MOI.Utilities.Model{Float64}()
-    set_optimizer(model, () -> make_opt(inner))
+    set_optimizer(model, () -> make_opt(MOI.Utilities.Model{Float64}))
     MOI.Utilities.attach_optimizer(model)
+    inner = unsafe_backend(model)
     S = MathOptComplements.ComplementsWithSetType{MOI.Interval{Float64}}
     @test MOI.get(inner, MOI.NumberOfConstraints{MOI.VectorOfVariables,S}()) ==
           0
@@ -697,7 +700,7 @@ function _test_opt_Vertical(make_opt)
     @variable(model, x3)
     @variable(model, 0.0 <= y3)
     @constraint(model, [1.0*x3, y3] ∈ MOI.Complements(2))
-    set_optimizer(model, () -> make_opt(Ipopt.Optimizer()))
+    set_optimizer(model, () -> make_opt(Ipopt.Optimizer))
     MOI.Utilities.attach_optimizer(model)
     return
 end
@@ -707,7 +710,7 @@ function _test_opt_Vertical_errors(make_opt)
     @variable(model, 0.0 <= x)
     @variable(model, 0.0 <= y)
     @constraint(model, [x, 1.0*y + x] ∈ MOI.Complements(2))
-    set_optimizer(model, () -> make_opt(Ipopt.Optimizer()))
+    set_optimizer(model, () -> make_opt(Ipopt.Optimizer))
     @test_throws Exception MOI.Utilities.attach_optimizer(model)
     return
 end
@@ -725,7 +728,8 @@ function _test_relaxation(relax)
     set_optimizer(
         model,
         () -> MathOptComplements.Optimizer(
-            MOI.instantiate(Ipopt.Optimizer; with_cache_type = Float64),
+            Ipopt.Optimizer;
+            with_cache_type = Float64,
         ),
     )
     set_attribute(
@@ -769,7 +773,7 @@ function test_simple_ncp()
         MathOptComplements.LiuFukushimaRelaxation(1e-8),
         MathOptComplements.KanzowSchwarzRelaxation(1e-8),
     ]
-        model = Model(() -> MathOptComplements.Optimizer(Ipopt.Optimizer()))
+        model = Model(() -> MathOptComplements.Optimizer(Ipopt.Optimizer))
         @variable(model, y <= 0, start = -1)
         @constraint(model, y + 1 ⟂ y)
         MOI.set(
@@ -804,7 +808,7 @@ function test_simple_lp_3()
         @constraint(model, z[2] ⟂ x[2])
         set_optimizer(
             model,
-            () -> MathOptComplements.Optimizer(Ipopt.Optimizer()),
+            () -> MathOptComplements.Optimizer(Ipopt.Optimizer),
         )
         MOI.set(
             model,
@@ -827,7 +831,7 @@ function test_fletcher_leyffer_ex1_model()
         MathOptComplements.LiuFukushimaRelaxation(1e-8),
         MathOptComplements.KanzowSchwarzRelaxation(1e-8),
     ]
-        model = Model(() -> MathOptComplements.Optimizer(Ipopt.Optimizer()))
+        model = Model(() -> MathOptComplements.Optimizer(Ipopt.Optimizer))
         @variable(model, z[1:2])
         set_lower_bound(z[2], 0)
         @objective(model, Min, (z[1] - 1)^2 + z[2]^2)
@@ -854,7 +858,7 @@ function test_reformulation_doesnt_error()
         MathOptComplements.LiuFukushimaRelaxation(1e-8),
         MathOptComplements.KanzowSchwarzRelaxation(1e-8),
     ]
-        model = Model(() -> MathOptComplements.Optimizer(Ipopt.Optimizer()))
+        model = Model(() -> MathOptComplements.Optimizer(Ipopt.Optimizer))
         # Case 1: Complementarity defined as lower-bound on RHS
         @variable(model, x1)
         @variable(model, 0.0 <= y1)
@@ -879,8 +883,10 @@ function test_nonlinear_reformulation()
     @variable(model, y >= 0.0)
     @objective(model, Min, x^2 + y^2 - 4*x*y)
     @constraint(model, [sin(x), y] ∈ MOI.Complements(2))
-    inner = MOI.Utilities.Model{Float64}()
-    set_optimizer(model, () -> MathOptComplements.Optimizer(inner))
+    set_optimizer(
+        model,
+        () -> MathOptComplements.Optimizer(MOI.Utilities.Model{Float64}),
+    )
     MOI.Utilities.attach_optimizer(model)
     expected = Model()
     @variable(expected, x >= 0.0)
@@ -903,8 +909,10 @@ function test_reformulation_fletcher_leyffer_ex1()
     set_lower_bound(z[2], 0)
     @objective(model, Min, (z[1] - 1)^2 + z[2]^2)
     @constraint(model, [z[2] - z[1], z[2]] ∈ MOI.Complements(2))
-    inner = MOI.Utilities.Model{Float64}()
-    set_optimizer(model, () -> MathOptComplements.Optimizer(inner))
+    set_optimizer(
+        model,
+        () -> MathOptComplements.Optimizer(MOI.Utilities.Model{Float64}),
+    )
     MOI.Utilities.attach_optimizer(model)
     expected = Model()
     @variable(expected, z[1:2])
@@ -929,7 +937,7 @@ function test_double_sided_bound_reformulations()
         # MathOptComplements.LiuFukushimaRelaxation(1e-8),
         MathOptComplements.KanzowSchwarzRelaxation(1e-8),
     ]
-        model = Model(() -> MathOptComplements.Optimizer(Ipopt.Optimizer()))
+        model = Model(() -> MathOptComplements.Optimizer(Ipopt.Optimizer))
         set_attribute(
             model,
             MathOptComplements.DefaultComplementarityReformulation(),
@@ -973,7 +981,7 @@ function test_greater_than_reformulations()
         MathOptComplements.LiuFukushimaRelaxation(1e-8),
         MathOptComplements.KanzowSchwarzRelaxation(1e-8),
     ]
-        model = Model(() -> MathOptComplements.Optimizer(Ipopt.Optimizer()))
+        model = Model(() -> MathOptComplements.Optimizer(Ipopt.Optimizer))
         set_attribute(
             model,
             MathOptComplements.DefaultComplementarityReformulation(),
@@ -1010,7 +1018,7 @@ function test_less_than_reformulations()
         MathOptComplements.LiuFukushimaRelaxation(1e-8),
         MathOptComplements.KanzowSchwarzRelaxation(1e-8),
     ]
-        model = Model(() -> MathOptComplements.Optimizer(Ipopt.Optimizer()))
+        model = Model(() -> MathOptComplements.Optimizer(Ipopt.Optimizer))
         set_attribute(
             model,
             MathOptComplements.DefaultComplementarityReformulation(),

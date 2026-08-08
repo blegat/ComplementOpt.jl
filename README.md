@@ -32,7 +32,7 @@ Use `MathOptComplements.jl` with JuMP as follows:
 using JuMP
 import Ipopt
 import MathOptComplements
-model = Model(() -> MathOptComplements.Optimizer(Ipopt.Optimizer()))
+model = Model(() -> MathOptComplements.Optimizer(Ipopt.Optimizer))
 set_attribute(
     model,
     MathOptComplements.DefaultComplementarityReformulation(),

@@ -3,6 +3,29 @@
 # Use of this source code is governed by an MIT-style license that can be found
 # in the LICENSE.md file or at https://opensource.org/licenses/MIT.
 
+"""
+    Optimizer(
+        factory;
+        coefficient_type::Type{T} = Float64,
+        kwargs...,
+    ) where {T}
+
+Create a new optimizer, where the inner optimizer is created by
+`MOI.instantiate(factory; kwargs...)`.
+
+## Examples
+
+```julia
+julia> using MathOptComplements, Ipopt
+
+julia> model = MathOptComplements.Optimizer(Ipopt.Optimizer);
+
+julia> model = MathOptComplements.Optimizer(
+           Ipopt.Optimizer;
+           with_cache_type = Float64,
+       );
+```
+"""
 mutable struct Optimizer{T,O<:MOI.ModelLike} <:
                MOI.Bridges.AbstractBridgeOptimizer
     model::O # This need to be called `model` by convention of `AbstractBridgeOptimizer`
@@ -11,7 +34,12 @@ mutable struct Optimizer{T,O<:MOI.ModelLike} <:
     con_to_name::Dict{MOI.ConstraintIndex,String}
     name_to_con::Union{Dict{String,MOI.ConstraintIndex},Nothing}
 
-    function Optimizer{T}(model::MOI.ModelLike) where {T}
+    function Optimizer(
+        factory::Any;
+        coefficient_type::Type{T} = Float64,
+        kwargs...,
+    ) where {T}
+        model = MOI.instantiate(factory; kwargs...)
         return new{T,typeof(model)}(
             model,
             ScholtesRelaxation(zero(T)),
@@ -21,8 +49,6 @@ mutable struct Optimizer{T,O<:MOI.ModelLike} <:
         )
     end
 end
-
-Optimizer(model::MOI.ModelLike) = Optimizer{Float64}(model)
 
 MOI.Bridges.Constraint.bridges(model::Optimizer) = model.constraint_map
 
